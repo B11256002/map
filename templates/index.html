@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧交通導航系統</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Noto Sans TC', sans-serif; }
+        #map { width: 100%; height: 100vh; z-index: 1; }
+
+        .control-panel {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
+            padding: 20px; border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15); width: 300px;
+        }
+
+        h2 { margin-top: 0; font-size: 1.2rem; color: #333; }
+        .instruction { font-size: 0.9rem; color: #666; margin-bottom: 15px; font-weight: bold; }
+
+        .btn {
+            width: 100%; padding: 10px; margin-top: 8px;
+            background: #2563eb; color: white; border: none;
+            border-radius: 8px; font-weight: bold; font-size: 0.95rem;
+            cursor: pointer; transition: 0.3s;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .btn-clear { background: #ef4444; }
+        .btn-clear:hover { background: #b91c1c; }
+        .btn-mode { background: #10b981; margin-bottom: 15px; }
+        .btn-mode:hover { background: #059669; }
+
+        /* 新增號誌的彈出表單 CSS */
+        .add-form input {
+            width: 90%; padding: 8px; margin: 5px 0;
+            border: 1px solid #ccc; border-radius: 5px;
+        }
+        .add-form button {
+            width: 100%; padding: 8px; margin-top: 10px;
+            background: #10b981; color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-weight: bold;
+        }
+
+        /* 號誌圖示 */
+        .light-marker {
+            width: 35px; height: 35px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white; font-size: 14px;
+            border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            text-shadow: 1px 1px 2px black;
+        }
+        .light-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; }
+        .light-green { background-color: #22c55e; box-shadow: 0 0 15px #22c55e; }
+
+        /* 📍 當前位置藍點外觀 */
+.user-location-dot {
+    width: 16px; height: 16px;
+    background-color: #3b82f6;
+    border: 3px solid white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0,0,0,0.4);
+    position: relative;
+}
+/* 藍點擴散呼吸燈特效 */
+.user-location-dot::after {
+    content: "";
+    position: absolute;
+    top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background-color: rgba(59, 130, 246, 0.4);
+    border-radius: 50%;
+    animation: pulse 2s infinite ease-out;
+    z-index: -1;
+}
+@keyframes pulse {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* 小按鈕樣式 */
+.btn-locate {
+    background: #f8fafc; color: #334155; border: 1px solid #cbd5e1;
+    margin-bottom: 10px;
+}
+.btn-locate:hover { background: #e2e8f0; }
+
+/* 🚗 導航箭頭圖示與旋轉動畫 */
+.nav-arrow-container {
+    width: 40px; height: 40px;
+    transition: transform 0.2s linear; /* 平滑旋轉動畫 */
+}
+.nav-arrow {
+    width: 100%; height: 100%;
+    /* 使用內建 SVG 繪製專業導航箭頭 */
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg>');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5));
+}
+        
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h2>智慧交通系統</h2>
+        
+        <!-- 模式切換按鈕 -->
+        <button class="btn btn-mode" id="mode-btn">切換至 🚦「新增號誌」模式</button>
+
+        <button class="btn btn-locate" id="locate-btn">📍 定位我的位置</button>
+        
+        <p class="instruction" id="status-text">🚗 導航模式：請點擊地圖設定「起點」</p>
+        
+        <div id="nav-controls">
+            <button class="btn" id="nav-btn" disabled>開始導航</button>
+            <button class="btn btn-clear" id="clear-btn">清除導航路線</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const map = L.map('map').setView([25.0330, 121.5654], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+// 狀態變數
+let isAddMode = false; 
+let endPoint = null; // 移除 startPoint，因為起點就是 userLatLng
+let endMarker = null, routeLayer = null;
+let trafficLightMarkers = {}; 
+
+// let userMarker = null; 
+// let userLatLng = null; // 格式: [lat, lng]
+
+const modeBtn = document.getElementById('mode-btn');
+const statusText = document.getElementById('status-text');
+const navBtn = document.getElementById('nav-btn');
+const clearBtn = document.getElementById('clear-btn');
+const navControls = document.getElementById('nav-controls');
+
+// --- 0. 智慧定位與跟隨系統 (導航箭頭) ---
+let userMarker = null; 
+let userLatLng = null; // 當前經緯度
+let lastLatLng = null; // 上一次的經緯度 (用來計算方向)
+let currentHeading = 0; // 車頭朝向 (0~360度)
+let isTracking = true; // 是否開啟「自動置中跟隨」
+
+// 計算兩個經緯度之間的角度 (Bearing)
+function calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = Math.PI / 180;
+    const toDeg = 180 / Math.PI;
+    const dLng = (lng2 - lng1) * toRad;
+    const y = Math.sin(dLng) * Math.cos(lat2 * toRad);
+    const x = Math.cos(lat1 * toRad) * Math.sin(lat2 * toRad) - Math.sin(lat1 * toRad) * Math.cos(lat2 * toRad) * Math.cos(dLng);
+    let brng = Math.atan2(y, x) * toDeg;
+    return (brng + 360) % 360;
+}
+
+if ("geolocation" in navigator) {
+    navigator.geolocation.watchPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            userLatLng = [lat, lng]; 
+
+            // 1. 取得方向 (Heading)
+            // 如果設備硬體有提供方向(手機電子羅盤)，直接使用
+            if (position.coords.heading !== null && !isNaN(position.coords.heading)) {
+                currentHeading = position.coords.heading;
+            } 
+            // 如果沒有硬體方向，則透過移動軌跡計算
+            else if (lastLatLng) {
+                // 為了避免 GPS 誤差導致箭頭亂轉，只有移動超過一定距離(2公尺)才更新方向
+                const distance = map.distance(lastLatLng, userLatLng);
+                if (distance > 2) {
+                    currentHeading = calculateBearing(lastLatLng[0], lastLatLng[1], lat, lng);
+                }
+            }
+            lastLatLng = userLatLng; // 儲存當前位置供下次計算
+
+            // 2. 更新或創建標記
+            if (!userMarker) {
+                const arrowIcon = L.divIcon({
+                    className: 'custom-user-icon',
+                    html: `<div class="nav-arrow-container" id="arrow-container" style="transform: rotate(${currentHeading}deg)"><div class="nav-arrow"></div></div>`,
+                    iconSize: [40, 40], iconAnchor: [20, 20]
+                });
+                userMarker = L.marker(userLatLng, { icon: arrowIcon, zIndexOffset: 1000 }).addTo(map);
+                map.setView(userLatLng, 17); // 初始化放大到導航視角
+            } else {
+                userMarker.setLatLng(userLatLng); // 更新位置
+                
+                // 動態旋轉箭頭 (不重新創建 Icon，效能更好)
+                const arrowContainer = document.getElementById('arrow-container');
+                if (arrowContainer) {
+                    arrowContainer.style.transform = `rotate(${currentHeading}deg)`;
+                }
+            }
+
+            // 3. 自動置中跟隨邏輯
+            if (isTracking) {
+                // panTo 可以平滑滑動地圖，保持箭頭在正中央
+                map.panTo(userLatLng); 
+            }
+        },
+        (error) => { console.warn("無法獲取位置: ", error.message); },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 }
+    );
+}
+
+// 當使用者「手動拖曳地圖」去查看其他地方時，暫停自動跟隨
+map.on('dragstart', () => {
+    isTracking = false;
+});
+
+// 點擊「定位按鈕」：重新開啟自動跟隨，並將畫面飛回箭頭處
+document.getElementById('locate-btn').addEventListener('click', () => {
+    if (userLatLng) {
+        isTracking = true;
+        map.flyTo(userLatLng, 17, { duration: 1 }); // 17 是適合導航的放大層級
+    } else {
+        alert("正在定位中，請稍候...");
+    }
+});
+
+// --- 2. 地圖點擊邏輯 ---
+map.on('click', function(e) {
+    if (isAddMode) {
+        // 【新增號誌模式】
+        const formHtml = `
+            <div class="add-form">
+                <h4 style="margin-top:0;">新增紅綠燈</h4>
+                <input type="text" id="new-name" placeholder="路口名稱 (例: 中山北路口)">
+                <input type="number" id="new-red" placeholder="紅燈秒數 (預設 30)">
+                <input type="number" id="new-green" placeholder="綠燈秒數 (預設 30)">
+                <button onclick="submitLight(${e.latlng.lat}, ${e.latlng.lng})">儲存並寫入資料庫</button>
+            </div>
+        `;
+        L.popup().setLatLng(e.latlng).setContent(formHtml).openOn(map);
+    } else {
+        // 【導航模式】直接設定終點
+        if (!userLatLng) {
+            alert("正在獲取您的當前位置，請稍等一下再設定目的地！");
+            return;
+        }
+
+        endPoint = e.latlng;
+        if (!endMarker) {
+            endMarker = L.marker(endPoint).addTo(map).bindPopup("目的地").openPopup();
+        } else {
+            // 如果已經點過目的地，只要移動圖標就好，不用產生新的
+            endMarker.setLatLng(endPoint).openPopup(); 
+        }
+        
+        statusText.innerText = "✅ 目的地已設定，請點擊開始導航";
+        navBtn.disabled = false;
+    }
+});
+
+// --- 3. 提交新紅綠燈給後端 ---
+async function submitLight(lat, lng) {
+    const name = document.getElementById('new-name').value;
+    const red = document.getElementById('new-red').value || 30;
+    const green = document.getElementById('new-green').value || 30;
+
+    if (!name) { alert("請輸入路口名稱！"); return; }
+
+    try {
+        const response = await fetch('/add-light', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, lat: lat, lng: lng, red_time: red, green_time: green })
+        });
+        if (response.ok) {
+            alert("✅ 成功新增紅綠燈！");
+            map.closePopup(); 
+            fetchTrafficLights(); 
+        } else alert("❌ 新增失敗，請檢查伺服器連線");
+    } catch (error) { alert("發生錯誤！"); }
+}
+
+// --- 4. 導航邏輯與清除按鈕 ---
+navBtn.addEventListener('click', async () => {
+    if (!userLatLng) {
+        alert("找不到您的當前位置！");
+        return;
+    }
+    if (!endPoint) return;
+    
+    navBtn.innerText = "規劃中...";
+    navBtn.disabled = true;
+
+    // 注意 OSRM 格式是 經度,緯度 (Lng, Lat)
+    // userLatLng 是 [lat, lng]，所以要反過來抓
+    const startStr = `${userLatLng[1]},${userLatLng[0]}`; 
+    const endStr = `${endPoint.lng},${endPoint.lat}`;
+
+    try {
+        const response = await fetch(`/route?start=${startStr}&end=${endStr}`);
+        const data = await response.json();
+        
+        if (routeLayer) map.removeLayer(routeLayer);
+        routeLayer = L.geoJSON(data.routes[0].geometry, { style: { color: '#3b82f6', weight: 6, opacity: 0.8 } }).addTo(map);
+        
+        // 自動調整視野，包含當前位置與路線
+        map.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+        statusText.innerText = "🚗 導航路線已生成！";
+    } catch (error) {
+        alert("路徑規劃失敗！");
+    } finally {
+        navBtn.innerText = "開始導航";
+        navBtn.disabled = false;
+    }
+});
+
+clearBtn.addEventListener('click', () => {
+    if (endMarker) map.removeLayer(endMarker);
+    if (routeLayer) map.removeLayer(routeLayer);
+    endPoint = null;
+    navBtn.disabled = true;
+    statusText.innerText = "🚗 請點擊地圖設定「目的地」";
+});
+
+// --- 5. 抓取與更新紅綠燈 ---
+async function fetchTrafficLights() {
+    try {
+        const response = await fetch('/traffic-lights');
+        const lights = await response.json();
+
+        lights.forEach(light => {
+            const id = light.name;
+            const cssClass = light.status === 'red' ? 'light-red' : 'light-green';
+            const icon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div class="light-marker ${cssClass}">${light.remain}</div>`,
+                iconSize: [35, 35], iconAnchor: [17, 17]
+            });
+
+            if (trafficLightMarkers[id]) {
+                trafficLightMarkers[id].setIcon(icon);
+            } else {
+                const marker = L.marker([light.lat, light.lng], { icon: icon }).addTo(map);
+                marker.bindPopup(`<b>${light.name}</b><br>紅燈:${light.red_time}s / 綠燈:${light.green_time}s`);
+                trafficLightMarkers[id] = marker;
+            }
+        });
+    } catch (error) { console.error("無法更新號誌:", error); }
+}
+
+fetchTrafficLights();
+setInterval(fetchTrafficLights, 1000);
+    </script>
+</body>
+</html>
