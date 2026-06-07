@@ -67,52 +67,55 @@
         .nav-arrow { width: 100%; height: 100%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg>'); background-size: contain; background-position: center; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); }
         .maplibregl-popup-content { padding: 15px; border-radius: 10px; }
 
-        /* --- 🌟 浮動號誌看板容器 (解決遮擋路口問題) --- */
+        /* --- 🌟 終極版防遮擋浮動看板 --- */
+/* 1. 容器：將尺寸歸零，讓 MapLibre 的座標系統完美精準打在 0,0 上 */
 .traffic-marker-wrapper {
     position: relative;
-    /* 讓整個容器的基準點維持在 0x0，這樣才能完美對齊經緯度 */
+    width: 0px; 
+    height: 0px;
 }
 
-/* 標記在真實經緯度上的小圓點 */
+/* 2. 小圓點：絕對置中於路口座標 */
 .intersection-dot {
+    position: absolute;
+    top: -7px;  /* 寬高 14 的一半，往上往左回拉，達成完美置中 */
+    left: -7px;
     width: 14px;
     height: 14px;
-    background-color: #3b82f6; /* 藍色指示點 */
-    border: 2px solid white;
+    background-color: #2563eb; /* 質感深藍色 */
+    border: 2px solid #ffffff;
     border-radius: 50%;
-    transform: translate(-50%, -50%); /* 完美置中於經緯度 */
-    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    box-shadow: 0 0 8px rgba(0,0,0,0.6);
     z-index: 2;
-    position: relative;
 }
 
-/* 將原本的看板改為絕對定位，推移到右上角 */
+/* 3. 看板本體：固定向右上方推移，完全不擋路 */
 .signboard-floating {
     position: absolute;
-    bottom: 15px; /* 往上推 */
-    left: 15px;   /* 往右推 */
-    background: rgba(15, 23, 42, 0.85);
-    backdrop-filter: blur(5px);
-    border-radius: 8px;
-    border: 1px solid #334155;
+    bottom: 12px;  /* 從圓點往上推 */
+    left: 12px;    /* 從圓點往右推 */
+    background: rgba(15, 23, 42, 0.9); /* 加深一點背景，字體更清楚 */
+    backdrop-filter: blur(8px);
+    border-radius: 10px;
+    border: 1px solid #475569;
     color: white;
-    padding: 10px;
-    font-size: 12px;
-    min-width: 130px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    padding: 12px;
+    font-size: 13px;
+    min-width: 140px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
     z-index: 1;
-    pointer-events: none; /* 避免滑鼠不小心點到看板干擾地圖操作 */
+    pointer-events: none; /* 避免滑鼠干擾地圖拖曳 */
 }
 
-/* 製作一個指向小圓點的三角形小尾巴 */
+/* 4. 看板尾巴：精準指向圓點的箭頭 */
 .signboard-floating::after {
     content: '';
     position: absolute;
-    bottom: -8px;
-    left: -8px;
-    border-width: 10px 14px 0 0;
+    bottom: -8px; 
+    left: -2px;   /* 調整尾巴位置，指向左下角的圓點 */
+    border-width: 12px 16px 0 0;
     border-style: solid;
-    border-color: rgba(15, 23, 42, 0.85) transparent transparent transparent;
+    border-color: rgba(15, 23, 42, 0.9) transparent transparent transparent;
 }
 
     </style>

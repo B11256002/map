@@ -133,19 +133,30 @@ def upload_telemetry():
                 
                 if target_idx != -1:
                     # (D) 計算從週期開始，到這個「目標時相」亮綠燈，中間經過了幾秒？
-                    offset_seconds = 0
+                    offset_to_green = 0
                     for i in range(target_idx):
-                        offset_seconds += phases[i]["green_time"] + YELLOW_TIME
+                        offset_to_green += phases[i]["green_time"] + YELLOW_TIME
+
+                    if event == "pass":
+                        # 【校正為綠燈】假設「現在」是該方向綠燈亮起的第 2 秒
+                        new_cycle_start = current_time - timedelta(seconds=(offset_to_green + 2))
+                        action_msg = "🟢 綠燈"
+
+                    elif event == "stop":
+                        # 【校正為紅燈】既然車子停了，代表該方向的綠燈「剛剛結束」，下一個方向的綠燈亮起了。
+                        # 所以我們要把時間軸，推移到該方向的「綠燈+黃燈」剛好跑完的那一秒。
+                        target_phase_duration = phases[target_idx]["green_time"] + YELLOW_TIME
+                        offset_to_red = offset_to_green + target_phase_duration
+
+                        # 假設紅燈剛亮起 1 秒
+                        new_cycle_start = current_time - timedelta(seconds=(offset_to_red + 1))
+                        action_msg = "🔴 紅燈"
                     
-                    # (E) 時空平移：我們假設「現在這一瞬間」剛好是該方向綠燈亮起的第 2 秒 (給一點緩衝)
-                    # 公式：新的週期起點 = 現在時間 - 目標時相前面的等待時間 - 2秒緩衝
-                    new_cycle_start = current_time - timedelta(seconds=(offset_seconds + 2))
-                    
-                    # (F) 更新資料庫！寫入新的時間基準點
+                    # (E) 更新資料庫！寫入新的時間基準點
                     new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
                     supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
                     
-                    #print(f"✨ 觸發自動校正！路口: {light_name} | 強制切換為 {target_keyword} 綠燈")
+                    print(f"✨ 觸發自動校正！路口: {light_name} | {keywords[0]} 強制切換為 {action_msg}")
 
         return jsonify({"message": "遙測資料接收成功，並執行校正評估"}), 201
 
