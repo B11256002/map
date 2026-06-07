@@ -154,11 +154,25 @@ def upload_telemetry():
                     
                     # (E) 更新資料庫！寫入新的時間基準點
                     new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
+                    res = supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
                     
-                    print(f"✨ 觸發自動校正！路口: {light_name} | {keywords[0]} 強制切換為 {action_msg}")
+                    # 🌟 將校正結果整理好，準備傳給前端
+                    debug_info = {
+                        "路口": light_name,
+                        "判定方向": keywords[0],
+                        "執行動作": action_msg,
+                        "新基準時間": new_time_str,
+                        "資料庫是否成功修改": len(res.data) > 0
+                    }
+                    print(f"✨ 觸發自動校正: {debug_info}")
 
-        return jsonify({"message": "遙測資料接收成功，並執行校正評估"}), 201
+                    return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
+                
+                else:
+                    # 如果找不到匹配的方向名稱
+                    return jsonify({"message": "資料接收成功，但方向名稱不匹配，未執行校正", "debug": "找不到目標時相"}), 201
+
+        return jsonify({"message": "遙測資料接收成功，無須校正"}), 201
 
     except Exception as e:
         print(f"遙測接收或校正失敗: {e}")

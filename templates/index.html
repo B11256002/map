@@ -529,31 +529,27 @@ async function sendTelemetry(lightName, event) {
     try {
         // 🌟 獲取下拉選單的值
         const forceHeadingValue = document.getElementById('force-heading').value;
-        
-        // 如果有強制設定方向，就用強制設定的；否則才用算出來的 currentHeading
-        let finalHeading = (forceHeadingValue !== "auto") 
-            ? forceHeadingValue 
-            : Math.round(currentHeading).toString();
+        let finalHeading = (forceHeadingValue !== "auto") ? forceHeadingValue : Math.round(currentHeading).toString();
 
-        await fetch('/upload-telemetry', {
+        const response = await fetch('/upload-telemetry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 device_id: myDeviceId,    
                 light_name: lightName,
-                direction: finalHeading,  // 👈 已經修正為 finalHeading
+                direction: finalHeading,  
                 event: event            
             })
         });
         
-        // 👈 這裡的 console.log 也修正為 finalHeading 了！
-        console.log(`📤 已上報: ${lightName} - 角度:${finalHeading}° - ${event}`);
+        // 🌟🌟🌟 把伺服器的回報印出來抓兇手！
+        const resData = await response.json();
+        console.log(`📤 上報狀態 [${finalHeading}° - ${event}]:`, resData);
         
         lastEventSent = event;
         currentApproachingLight = lightName;
 
-        // 🌟 關鍵解法：上報完立刻重新抓取後端的最新紅綠燈時間！
-        fetchTrafficLights(); 
+        fetchTrafficLights();
         
     } catch (e) {
         console.error("上報失敗", e);
