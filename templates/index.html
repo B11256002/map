@@ -386,11 +386,16 @@ const YELLOW_TIME = 3; // 統一黃燈秒數
 let rawLightsData = []; // 儲存從資料庫抓來的一次性原始資料
 
 // 1. 只負責「抓取資料」（只需執行一次，或每隔幾分鐘執行一次更新路口）
+// --- 🌟 完美效能版：前端本地運算倒數 ---
 async function fetchTrafficLights() {
     try {
-        const response = await fetch('/traffic-lights'); 
+        // 🌟 關鍵修正：加上 ?t=時間戳 與 cache: 'no-store'，強制每次都去資料庫拿最新鮮的資料！
+        const url = '/traffic-lights?t=' + new Date().getTime();
+        const response = await fetch(url, { cache: 'no-store' }); 
+        
         rawLightsData = await response.json();
-        // 抓完資料後，馬上觸發第一次畫面更新
+        
+        // 抓完資料後，馬上觸發畫面更新
         updateTrafficLightsUI();
     } catch (error) { 
         console.error("抓取號誌資料失敗:", error); 
