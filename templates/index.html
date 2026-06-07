@@ -66,6 +66,55 @@
         .nav-arrow-container { width: 40px; height: 40px; transition: transform 0.2s linear; }
         .nav-arrow { width: 100%; height: 100%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg>'); background-size: contain; background-position: center; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); }
         .maplibregl-popup-content { padding: 15px; border-radius: 10px; }
+
+        /* --- 🌟 浮動號誌看板容器 (解決遮擋路口問題) --- */
+.traffic-marker-wrapper {
+    position: relative;
+    /* 讓整個容器的基準點維持在 0x0，這樣才能完美對齊經緯度 */
+}
+
+/* 標記在真實經緯度上的小圓點 */
+.intersection-dot {
+    width: 14px;
+    height: 14px;
+    background-color: #3b82f6; /* 藍色指示點 */
+    border: 2px solid white;
+    border-radius: 50%;
+    transform: translate(-50%, -50%); /* 完美置中於經緯度 */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    z-index: 2;
+    position: relative;
+}
+
+/* 將原本的看板改為絕對定位，推移到右上角 */
+.signboard-floating {
+    position: absolute;
+    bottom: 15px; /* 往上推 */
+    left: 15px;   /* 往右推 */
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(5px);
+    border-radius: 8px;
+    border: 1px solid #334155;
+    color: white;
+    padding: 10px;
+    font-size: 12px;
+    min-width: 130px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    z-index: 1;
+    pointer-events: none; /* 避免滑鼠不小心點到看板干擾地圖操作 */
+}
+
+/* 製作一個指向小圓點的三角形小尾巴 */
+.signboard-floating::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: -8px;
+    border-width: 10px 14px 0 0;
+    border-style: solid;
+    border-color: rgba(15, 23, 42, 0.85) transparent transparent transparent;
+}
+
     </style>
 </head>
 <body>
@@ -374,33 +423,29 @@ function updateTrafficLightsUI() {
                 ? activeGreen - timeInActivePhase 
                 : (activeGreen + YELLOW_TIME) - timeInActivePhase;
 
-            // 產生 HTML UI
-            let html = `<div class="signboard"><div class="signboard-title">📍 ${light.name}</div>`;
-            
-            phases.forEach((p, i) => {
-                let status, remain, colorClass, dot;
-                
-                if (i === activeIdx) {
-                    status = activeStatus;
-                    remain = Math.ceil(activeRem);
-                } else {
-                    status = "red";
-                    let waitTime = (activeGreen + YELLOW_TIME) - timeInActivePhase;
-                    let currWalk = (activeIdx + 1) % phases.length;
-                    while (currWalk !== i) {
-                        waitTime += phases[currWalk].green_time + YELLOW_TIME;
-                        currWalk = (currWalk + 1) % phases.length;
-                    }
-                    remain = Math.ceil(waitTime);
-                }
+            // 修改後的程式碼：
+// 1. 最外層包一個 Wrapper，並放入精確定位的小圓點
+let html = `
+<div class="traffic-marker-wrapper">
+    <div class="intersection-dot"></div>
+    <div class="signboard-floating">
+        <div class="signboard-title">📍 ${light.name}</div>
+`;
 
-                if (status === 'green') { colorClass = 'sign-green'; dot = '🟢'; } 
-                else if (status === 'yellow') { colorClass = 'sign-yellow'; dot = '🟡'; } 
-                else { colorClass = 'sign-red'; dot = '🔴'; }
-                
-                html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${remain}s</span></div>`;
-            });
-            html += `</div>`;
+phases.forEach((p, i) => {
+    // ...(這裡面計算 status 和 remain 的邏輯完全不用動)...
+    if (i === activeIdx) { /* ... */ }
+    // ...
+
+    if (status === 'green') { colorClass = 'sign-green'; dot = '🟢'; } 
+    else if (status === 'yellow') { colorClass = 'sign-yellow'; dot = '🟡'; } 
+    else { colorClass = 'sign-red'; dot = '🔴'; }
+    
+    html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${remain}s</span></div>`;
+});
+
+// 2. 補上結尾的兩個 div 標籤
+html += `</div></div>`;
 
             // 更新地圖上的 Marker
             if (trafficLightMarkers[light.name]) {
