@@ -420,7 +420,8 @@ function updateTrafficLightsUI() {
             if (totalTime <= 0) return;
 
             // 計算目前在週期內的秒數
-            let currentInCycle = Math.max(0, elapsedSec % totalTime);
+            // 🌟 防彈版：完美處理電腦與伺服器的時間差 (支援負數循環)
+            let currentInCycle = (elapsedSec % totalTime + totalTime) % totalTime;
             
             let accumulated = 0;
             let activeIdx = 0;

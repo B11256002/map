@@ -138,7 +138,7 @@ def upload_telemetry():
                         target_elapsed = 0
                         for i in range(target_idx):
                             target_elapsed += phases[i]["green_time"] + YELLOW_TIME
-                        target_elapsed += 3
+                        target_elapsed += 0
                         action_msg = f"🟢 綠燈 (剛亮起 3 秒)"
                         
                     elif event == "stop":
