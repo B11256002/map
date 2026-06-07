@@ -99,7 +99,7 @@ def upload_telemetry():
         # ==========================================
         # 🌟 核心魔法：動態校正演算法 (Dynamic Calibration)
         # ==========================================
-        if event == "pass" and direction_angle:
+        if event in ["pass", "stop"] and direction_angle:  # 👈 加上 "stop"，讓它放行！
             angle = float(direction_angle)
             
             # (A) 將 360 度轉換為精準的「單向」與「雙向」關鍵字
