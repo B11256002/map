@@ -85,22 +85,23 @@ def upload_telemetry():
         if not all([device_id, light_name, event]):
             return jsonify({"error": "缺少必要參數"}), 400
 
-        # 準備寫入資料庫的內容
+        # 🌟 加上 utc 時間
+        current_time = datetime.now(timezone.utc).isoformat()
+
         payload = {
             "device_id": device_id,
             "light_name": light_name,
             "direction": direction,
-            "event": event
+            "event": event,
+            "created_at": current_time  # 👈 新增這行，把時間寫進去！
         }
 
-        # 寫入 Supabase 的 telemetry_data 表單
         response = supabase.table("telemetry_data").insert(payload).execute()
-        
-        return jsonify({"message": "遙測資料接收成功", "data": response.data}), 201
+        return jsonify({"message": "遙測資料接收成功"}), 201
 
     except Exception as e:
         print(f"遙測接收失敗: {e}")
-        return jsonify({"error": "伺服器錯誤"}), 500
+        return jsonify({"error": "伺服器錯誤", "details": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)

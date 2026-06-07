@@ -444,20 +444,23 @@ let lastEventSent = null; // 防止重複瘋狂發送同一個狀態
 
 // 1. 建立打 API 的函式
 async function sendTelemetry(lightName, event) {
-    if (lastEventSent === event && currentApproachingLight === lightName) return; // 避免重複發送
+    if (lastEventSent === event && currentApproachingLight === lightName) return; 
     
     try {
+        // 🌟 把 currentHeading 傳給後端 (例如: 90 代表向東, 180 代表向南)
+        let headingStr = Math.round(currentHeading).toString();
+
         await fetch('/upload-telemetry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                device_id: myDeviceId,    // 剛才建立的匿名 ID
+                device_id: myDeviceId,    
                 light_name: lightName,
-                direction: "未知(待擴充)", // 暫時先寫死，未來再靠 Heading 換算
-                event: event              // "stop" 或 "pass"
+                direction: headingStr,  // 👈 把「未知」改成真實的車頭角度！
+                event: event            
             })
         });
-        console.log(`📤 已上報: ${lightName} - ${event}`);
+        console.log(`📤 已上報: ${lightName} - 角度:${headingStr}° - ${event}`);
         
         lastEventSent = event;
         currentApproachingLight = lightName;
