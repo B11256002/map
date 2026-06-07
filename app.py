@@ -132,26 +132,32 @@ def upload_telemetry():
                         break
                 
                 if target_idx != -1:
-                    # (D) 計算從週期開始，到這個「目標時相」亮綠燈，中間經過了幾秒？
+                    # 🌟 計算「總週期時間」
+                    total_cycle = sum(p["green_time"] + YELLOW_TIME for p in phases)
+                    
+                    # (D) 計算 offset
                     offset_to_green = 0
                     for i in range(target_idx):
                         offset_to_green += phases[i]["green_time"] + YELLOW_TIME
                     
+                    target_phase_duration = phases[target_idx]["green_time"] + YELLOW_TIME
+                    offset_to_red = offset_to_green + target_phase_duration
+                    
                     if event == "pass":
-                        # 【校正為綠燈】狠狠推入綠燈區間 (假設已經綠燈 3 秒了)
-                        new_cycle_start = current_time - timedelta(seconds=(offset_to_green + 3))
-                        action_msg = "🟢 綠燈"
+                        # 【校正為綠燈】推到該方向綠燈的「正中間」
+                        safe_buffer = phases[target_idx]["green_time"] / 2
+                        target_elapsed = offset_to_green + safe_buffer
+                        action_msg = f"🟢 綠燈 (鎖定在正中間，容錯率 ±{int(safe_buffer)}秒)"
 
                     elif event == "stop":
-                        # 【校正為紅燈】計算該方向綠/黃燈總共佔用多少時間
-                        target_phase_duration = phases[target_idx]["green_time"] + YELLOW_TIME
-                        offset_to_red = offset_to_green + target_phase_duration
-                        
-                        # 狠狠推入紅燈區間 (假設紅燈已經亮起 5 秒了，消除伺服器與電腦的時間差)
-                        new_cycle_start = current_time - timedelta(seconds=(offset_to_red + 5))
-                        action_msg = "🔴 紅燈"
+                        # 【校正為紅燈】推到該方向紅燈的「正中間」
+                        red_duration = total_cycle - target_phase_duration
+                        safe_buffer = red_duration / 2
+                        target_elapsed = offset_to_red + safe_buffer
+                        action_msg = f"🔴 紅燈 (鎖定在正中間，容錯率 ±{int(safe_buffer)}秒)"
 
                     # (E) 更新資料庫！寫入新的時間基準點
+                    new_cycle_start = current_time - timedelta(seconds=target_elapsed)
                     new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
                     supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
                     
@@ -159,7 +165,7 @@ def upload_telemetry():
                     debug_info = {
                         "路口": light_name,
                         "判定方向": keywords[0],
-                        "執行動作": action_msg
+                        "執行動作": action_msg,
                     }
                     print(f"✨ 觸發自動校正: {debug_info}")
                     return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
