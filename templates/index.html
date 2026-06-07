@@ -517,12 +517,15 @@ let currentApproachingLight = null; // 記錄目前靠近哪個紅綠燈
 let lastEventSent = null; // 防止重複瘋狂發送同一個狀態
 
 // 1. 建立打 API 的函式
+// 1. 建立打 API 的函式
 async function sendTelemetry(lightName, event) {
     if (lastEventSent === event && currentApproachingLight === lightName) return; 
-
-    const forceHeadingValue = document.getElementById('force-heading').value;
     
     try {
+        // 🌟 獲取下拉選單的值
+        const forceHeadingValue = document.getElementById('force-heading').value;
+        
+        // 如果有強制設定方向，就用強制設定的；否則才用算出來的 currentHeading
         let finalHeading = (forceHeadingValue !== "auto") 
             ? forceHeadingValue 
             : Math.round(currentHeading).toString();
@@ -533,18 +536,20 @@ async function sendTelemetry(lightName, event) {
             body: JSON.stringify({
                 device_id: myDeviceId,    
                 light_name: lightName,
-                direction: finalHeading,  // 👈 使用這個 finalHeading
+                direction: finalHeading,  // 👈 已經修正為 finalHeading
                 event: event            
             })
         });
-        console.log(`📤 已上報: ${lightName} - 角度:${headingStr}° - ${event}`);
+        
+        // 👈 這裡的 console.log 也修正為 finalHeading 了！
+        console.log(`📤 已上報: ${lightName} - 角度:${finalHeading}° - ${event}`);
         
         lastEventSent = event;
         currentApproachingLight = lightName;
 
-        // 🌟🌟🌟 關鍵解法：上報完立刻重新抓取後端的最新紅綠燈時間！
+        // 🌟 關鍵解法：上報完立刻重新抓取後端的最新紅綠燈時間！
         fetchTrafficLights(); 
-
+        
     } catch (e) {
         console.error("上報失敗", e);
     }
