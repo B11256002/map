@@ -97,6 +97,25 @@
     <div id="map"></div>
 
     <script>
+
+        // --- 🚗 生成並獲取匿名設備 ID ---
+function getOrCreateDeviceId() {
+    // 嘗試從瀏覽器的 LocalStorage 讀取現有的 ID
+    let deviceId = localStorage.getItem('nav_device_id');
+    
+    // 如果沒有（代表是第一次打開網頁的新使用者）
+    if (!deviceId) {
+        // 使用瀏覽器內建加密 API 產生標準 UUID (例如: "36b8f84d-df4e-4d49-b662-bcde71a8764f")
+        deviceId = crypto.randomUUID(); 
+        // 存入 LocalStorage，下次重整網頁就不會變了
+        localStorage.setItem('nav_device_id', deviceId);
+    }
+    return deviceId;
+}
+
+const myDeviceId = getOrCreateDeviceId();
+console.log("我的匿名車牌是：", myDeviceId);
+
         const map = new maplibregl.Map({
             container: 'map', style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
             center: [121.5654, 25.0330], zoom: 14, pitch: 0, bearing: 0 
