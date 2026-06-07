@@ -135,6 +135,18 @@
         <button class="btn btn-simulate" id="simulate-btn">🚗 模擬開車</button>
     </div>
 
+            <!-- 🌟 開發者專用：強制方向控制器 -->
+        <div style="margin-top:15px; padding:10px; background:#fde047; border-radius:8px; font-size:14px; color:#854d0e; font-weight:bold;">
+            🛠️ 測試專用：強制車頭方向<br>
+            <select id="force-heading" style="width:100%; margin-top:5px; padding:5px;">
+                <option value="auto">📍 自動抓取 (預設)</option>
+                <option value="0">⬆️ 往北開 (0°)</option>
+                <option value="90">➡️ 往東開 (90°)</option>
+                <option value="180">⬇️ 往南開 (180°)</option>
+                <option value="270">⬅️ 往西開 (270°)</option>
+            </select>
+        </div>
+
     <!-- 導航介面 -->
     <div class="nav-dashboard nav-top" id="nav-top"><h1 id="nav-instruction">↑ 沿著藍色路線前進</h1><p>請小心駕駛並觀察路口號誌</p></div>
     <div class="nav-dashboard nav-bottom" id="nav-bottom">
@@ -507,10 +519,13 @@ let lastEventSent = null; // 防止重複瘋狂發送同一個狀態
 // 1. 建立打 API 的函式
 async function sendTelemetry(lightName, event) {
     if (lastEventSent === event && currentApproachingLight === lightName) return; 
+
+    const forceHeadingValue = document.getElementById('force-heading').value;
     
     try {
-        // 🌟 把 currentHeading 傳給後端 (例如: 90 代表向東, 180 代表向南)
-        let headingStr = Math.round(currentHeading).toString();
+        let finalHeading = (forceHeadingValue !== "auto") 
+            ? forceHeadingValue 
+            : Math.round(currentHeading).toString();
 
         await fetch('/upload-telemetry', {
             method: 'POST',
@@ -518,7 +533,7 @@ async function sendTelemetry(lightName, event) {
             body: JSON.stringify({
                 device_id: myDeviceId,    
                 light_name: lightName,
-                direction: headingStr,  // 👈 把「未知」改成真實的車頭角度！
+                direction: finalHeading,  // 👈 使用這個 finalHeading
                 event: event            
             })
         });
@@ -526,6 +541,10 @@ async function sendTelemetry(lightName, event) {
         
         lastEventSent = event;
         currentApproachingLight = lightName;
+
+        // 🌟🌟🌟 關鍵解法：上報完立刻重新抓取後端的最新紅綠燈時間！
+        fetchTrafficLights(); 
+
     } catch (e) {
         console.error("上報失敗", e);
     }
