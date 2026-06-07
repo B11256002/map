@@ -132,29 +132,26 @@ def upload_telemetry():
                         break
                 
                 if target_idx != -1:
-                    # 🌟 計算「總週期時間」
-                    total_cycle = sum(p["green_time"] + YELLOW_TIME for p in phases)
-                    
-                    # (D) 計算 offset
-                    offset_to_green = 0
-                    for i in range(target_idx):
-                        offset_to_green += phases[i]["green_time"] + YELLOW_TIME
-                    
-                    target_phase_duration = phases[target_idx]["green_time"] + YELLOW_TIME
-                    offset_to_red = offset_to_green + target_phase_duration
                     
                     if event == "pass":
-                        # 【校正為綠燈】推到該方向綠燈的「正中間」
-                        safe_buffer = phases[target_idx]["green_time"] / 2
-                        target_elapsed = offset_to_green + safe_buffer
-                        action_msg = f"🟢 綠燈 (鎖定在正中間，容錯率 ±{int(safe_buffer)}秒)"
-
+                        # 【校正為綠燈】我們希望現在亮綠燈的是「目標方向」
+                        forced_active_idx = target_idx
+                        action_msg = f"🟢 綠燈 (鎖定該方向)"
+                    
                     elif event == "stop":
-                        # 【校正為紅燈】推到該方向紅燈的「正中間」
-                        red_duration = total_cycle - target_phase_duration
-                        safe_buffer = red_duration / 2
-                        target_elapsed = offset_to_red + safe_buffer
-                        action_msg = f"🔴 紅燈 (鎖定在正中間，容錯率 ±{int(safe_buffer)}秒)"
+                        # 【校正為紅燈】既然該方向停下，代表它結束了。
+                        # 我們強制讓「下一個順位」的方向亮起綠燈！(確保順序絕對正確)
+                        forced_active_idx = (target_idx + 1) % len(phases)
+                        action_msg = f"🔴 紅燈 (強制讓下一順位亮綠燈)"
+
+                    # (D) 計算從週期開始，到這個「被強制啟動的時相」經過了多久
+                    offset_to_forced_phase = 0
+                    for i in range(forced_active_idx):
+                        offset_to_forced_phase += phases[i]["green_time"] + YELLOW_TIME
+                    
+                    # 狠狠推入這個被啟動時相的「綠燈正中間」(絕對避開黃燈交界處)
+                    safe_buffer = phases[forced_active_idx]["green_time"] / 2
+                    target_elapsed = offset_to_forced_phase + safe_buffer
 
                     # (E) 更新資料庫！寫入新的時間基準點
                     new_cycle_start = current_time - timedelta(seconds=target_elapsed)
@@ -165,14 +162,11 @@ def upload_telemetry():
                     debug_info = {
                         "路口": light_name,
                         "判定方向": keywords[0],
-                        "執行動作": action_msg,
+                        "執行動作": action_msg
                     }
                     print(f"✨ 觸發自動校正: {debug_info}")
                     return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
-                
-                else:
-                    # 如果找不到匹配的方向名稱
-                    return jsonify({"message": "資料接收成功，但方向名稱不匹配，未執行校正", "debug": "找不到目標時相"}), 201
+
 
         return jsonify({"message": "遙測資料接收成功，無須校正"}), 201
 
