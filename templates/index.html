@@ -298,42 +298,111 @@
         }
         document.getElementById('deviate-btn').addEventListener('click', () => { if (isNavigating) updateUserLocationUI(userLngLat[0] + 0.001, userLngLat[1], currentHeading); });
 
-                // --- 🌟 支援黃燈：渲染電子看板 ---
-        async function fetchTrafficLights() {
-            try {
-                const response = await fetch('/traffic-lights'); 
-                const lights = await response.json();
-                
-                lights.forEach(light => {
-                    let html = `<div class="signboard"><div class="signboard-title">📍 ${light.name}</div>`;
-                    
-                    light.phases.forEach(p => {
-                        // 根據狀態給予顏色和圖示
-                        let colorClass = 'sign-red';
-                        let dot = '🔴';
-                        
-                        if (p.status === 'green') {
-                            colorClass = 'sign-green';
-                            dot = '🟢';
-                        } else if (p.status === 'yellow') {
-                            colorClass = 'sign-yellow';
-                            dot = '🟡';
-                        }
-                        
-                        html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${p.remain}s</span></div>`;
-                    });
-                    html += `</div>`;
+        // --- 🌟 完美效能版：前端本地運算倒數 ---
+const YELLOW_TIME = 3; // 統一黃燈秒數
+let rawLightsData = []; // 儲存從資料庫抓來的一次性原始資料
 
-                    if (trafficLightMarkers[light.name]) {
-                        trafficLightMarkers[light.name].getElement().innerHTML = html;
-                    } else {
-                        const el = document.createElement('div'); el.innerHTML = html;
-                        trafficLightMarkers[light.name] = new maplibregl.Marker({ element: el }).setLngLat([light.lng, light.lat]).addTo(map);
+// 1. 只負責「抓取資料」（只需執行一次，或每隔幾分鐘執行一次更新路口）
+async function fetchTrafficLights() {
+    try {
+        const response = await fetch('/traffic-lights'); 
+        rawLightsData = await response.json();
+        // 抓完資料後，馬上觸發第一次畫面更新
+        updateTrafficLightsUI();
+    } catch (error) { 
+        console.error("抓取號誌資料失敗:", error); 
+    }
+}
+
+// 2. 負責「計算秒數與更新畫面」（每秒在本地執行，完全不耗費網路流量）
+function updateTrafficLightsUI() {
+    const now = new Date(); // 取得用戶本地目前時間
+
+    rawLightsData.forEach(light => {
+        try {
+            // 解析資料庫的開始時間 (UTC)
+            const startTime = new Date(light.cycle_start);
+            const elapsedSec = (now.getTime() - startTime.getTime()) / 1000;
+            const phases = light.phases;
+            if (!phases || phases.length === 0) return;
+
+            // 計算總週期
+            let totalTime = 0;
+            phases.forEach(p => totalTime += (p.green_time + YELLOW_TIME));
+            if (totalTime <= 0) return;
+
+            // 計算目前在週期內的秒數
+            let currentInCycle = Math.max(0, elapsedSec % totalTime);
+            
+            let accumulated = 0;
+            let activeIdx = 0;
+
+            // 找出目前亮燈的時相
+            for (let i = 0; i < phases.length; i++) {
+                let phaseDur = phases[i].green_time + YELLOW_TIME;
+                if (currentInCycle < accumulated + phaseDur) {
+                    activeIdx = i;
+                    break;
+                }
+                accumulated += phaseDur;
+            }
+
+            let timeInActivePhase = currentInCycle - accumulated;
+            let activeGreen = phases[activeIdx].green_time;
+
+            let activeStatus = timeInActivePhase < activeGreen ? "green" : "yellow";
+            let activeRem = activeStatus === "green" 
+                ? activeGreen - timeInActivePhase 
+                : (activeGreen + YELLOW_TIME) - timeInActivePhase;
+
+            // 產生 HTML UI
+            let html = `<div class="signboard"><div class="signboard-title">📍 ${light.name}</div>`;
+            
+            phases.forEach((p, i) => {
+                let status, remain, colorClass, dot;
+                
+                if (i === activeIdx) {
+                    status = activeStatus;
+                    remain = Math.ceil(activeRem);
+                } else {
+                    status = "red";
+                    let waitTime = (activeGreen + YELLOW_TIME) - timeInActivePhase;
+                    let currWalk = (activeIdx + 1) % phases.length;
+                    while (currWalk !== i) {
+                        waitTime += phases[currWalk].green_time + YELLOW_TIME;
+                        currWalk = (currWalk + 1) % phases.length;
                     }
-                });
-            } catch (error) { console.error("號誌:", error); }
+                    remain = Math.ceil(waitTime);
+                }
+
+                if (status === 'green') { colorClass = 'sign-green'; dot = '🟢'; } 
+                else if (status === 'yellow') { colorClass = 'sign-yellow'; dot = '🟡'; } 
+                else { colorClass = 'sign-red'; dot = '🔴'; }
+                
+                html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${remain}s</span></div>`;
+            });
+            html += `</div>`;
+
+            // 更新地圖上的 Marker
+            if (trafficLightMarkers[light.name]) {
+                trafficLightMarkers[light.name].getElement().innerHTML = html;
+            } else {
+                const el = document.createElement('div'); 
+                el.innerHTML = html;
+                trafficLightMarkers[light.name] = new maplibregl.Marker({ element: el })
+                    .setLngLat([light.lng, light.lat])
+                    .addTo(map);
+            }
+        } catch (e) {
+            console.error(`計算 ${light.name} 發生錯誤:`, e);
         }
-        fetchTrafficLights(); setInterval(fetchTrafficLights, 1000);
+    });
+}
+
+// 3. 啟動機制
+fetchTrafficLights(); // 網頁載入時抓一次資料庫
+setInterval(updateTrafficLightsUI, 100); // 💡 每 0.1 秒刷新一次畫面（因為是本地計算，不怕流量，倒數會超滑順！）
+setInterval(fetchTrafficLights, 60000); // 💡 每 1 分鐘才去後端問看看有沒有人新增新的紅綠燈
     </script>
 </body>
 </html>
