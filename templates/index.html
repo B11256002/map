@@ -422,6 +422,92 @@ function updateTrafficLightsUI() {
 fetchTrafficLights(); // 網頁載入時抓一次資料庫
 setInterval(updateTrafficLightsUI, 100); // 💡 每 0.1 秒刷新一次畫面（因為是本地計算，不怕流量，倒數會超滑順！）
 setInterval(fetchTrafficLights, 60000); // 💡 每 1 分鐘才去後端問看看有沒有人新增新的紅綠燈
+
+// --- 🛠️ 開發者測試專用：按「滑鼠右鍵」瞬間移動車子 ---
+map.on('contextmenu', (e) => {
+    // 如果正在自動模擬導航，就不允許手動干擾
+    if (simState.active) return; 
+
+    const lng = e.lngLat.lng;
+    const lat = e.lngLat.lat;
+
+    // 1. 強制更新使用者的座標到滑鼠右鍵點擊的地方
+    updateUserLocationUI(lng, lat, currentHeading);
+    
+    // 2. 為了避免真實 GPS 一直把你拉回原地，我們暫時印出提示
+    console.log(`🚗 車輛已手動瞬移至: ${lng.toFixed(5)}, ${lat.toFixed(5)}`);
+});
+
+// --- 🛰️ 遙測上報系統 (Telemetry) ---
+let currentApproachingLight = null; // 記錄目前靠近哪個紅綠燈
+let lastEventSent = null; // 防止重複瘋狂發送同一個狀態
+
+// 1. 建立打 API 的函式
+async function sendTelemetry(lightName, event) {
+    if (lastEventSent === event && currentApproachingLight === lightName) return; // 避免重複發送
+    
+    try {
+        await fetch('/upload-telemetry', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                device_id: myDeviceId,    // 剛才建立的匿名 ID
+                light_name: lightName,
+                direction: "未知(待擴充)", // 暫時先寫死，未來再靠 Heading 換算
+                event: event              // "stop" 或 "pass"
+            })
+        });
+        console.log(`📤 已上報: ${lightName} - ${event}`);
+        
+        lastEventSent = event;
+        currentApproachingLight = lightName;
+    } catch (e) {
+        console.error("上報失敗", e);
+    }
+}
+
+// 2. 核心雷達偵測邏輯 (每秒檢查一次)
+setInterval(() => {
+    if (!userLngLat || rawLightsData.length === 0) return;
+
+    let userPt = turf.point(userLngLat);
+    let nearestLight = null;
+    let minDistance = Infinity;
+
+    // 找出離車子最近的紅綠燈
+    rawLightsData.forEach(light => {
+        let lightPt = turf.point([light.lng, light.lat]);
+        let dist = turf.distance(userPt, lightPt, { units: 'meters' });
+        if (dist < minDistance) {
+            minDistance = dist;
+            nearestLight = light;
+        }
+    });
+
+    // 邏輯判斷
+    if (nearestLight && minDistance <= 30) {
+        // 【狀況 A】在路口 30 公尺內
+        
+        // 取得目前的車速 (這裡用模擬狀態來判斷，若無移動視為速度 0)
+        // 為了測試方便，我們先預設如果你沒有在「導航模擬移動中」，就是停著的
+        let isMoving = simState.active || isNavigating; 
+        
+        if (!isMoving) {
+            // 車子停下來了 -> 傳送 stop
+            sendTelemetry(nearestLight.name, "stop");
+        }
+    } 
+    else if (currentApproachingLight && minDistance > 30) {
+        // 【狀況 B】原本靠近路口，現在駛離超過 30 公尺 -> 代表穿越過去了！
+        sendTelemetry(currentApproachingLight, "pass");
+        
+        // 清除狀態，準備迎接下一個路口
+        currentApproachingLight = null; 
+        lastEventSent = null;
+    }
+
+}, 1000);
+
     </script>
 </body>
 </html>

@@ -73,5 +73,34 @@ def route():
     except:
         return jsonify({"error": "規劃錯誤"}), 502
 
+@app.route("/upload-telemetry", methods=["POST"])
+def upload_telemetry():
+    try:
+        data = request.get_json()
+        device_id = data.get("device_id")
+        light_name = data.get("light_name")
+        direction = data.get("direction")
+        event = data.get("event")
+
+        if not all([device_id, light_name, event]):
+            return jsonify({"error": "缺少必要參數"}), 400
+
+        # 準備寫入資料庫的內容
+        payload = {
+            "device_id": device_id,
+            "light_name": light_name,
+            "direction": direction,
+            "event": event
+        }
+
+        # 寫入 Supabase 的 telemetry_data 表單
+        response = supabase.table("telemetry_data").insert(payload).execute()
+        
+        return jsonify({"message": "遙測資料接收成功", "data": response.data}), 201
+
+    except Exception as e:
+        print(f"遙測接收失敗: {e}")
+        return jsonify({"error": "伺服器錯誤"}), 500
+
 if __name__ == "__main__":
     app.run(debug=True)
