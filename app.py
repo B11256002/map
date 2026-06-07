@@ -1,7 +1,7 @@
 import os
 from flask import Flask, render_template, request, jsonify
 from supabase import create_client
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 from dotenv import load_dotenv
 
@@ -79,28 +79,78 @@ def upload_telemetry():
         data = request.get_json()
         device_id = data.get("device_id")
         light_name = data.get("light_name")
-        direction = data.get("direction")
+        direction_angle = data.get("direction") # 這裡是數字字串，例如 "0" 或 "90"
         event = data.get("event")
 
         if not all([device_id, light_name, event]):
             return jsonify({"error": "缺少必要參數"}), 400
 
-        # 🌟 加上 utc 時間
-        current_time = datetime.now(timezone.utc).isoformat()
-
+        # 1. 寫入遙測數據 (Telemetry)
+        current_time = datetime.now(timezone.utc)
         payload = {
             "device_id": device_id,
             "light_name": light_name,
-            "direction": direction,
+            "direction": direction_angle,
             "event": event,
-            "created_at": current_time  # 👈 新增這行，把時間寫進去！
+            "created_at": current_time.isoformat()
         }
+        supabase.table("telemetry_data").insert(payload).execute()
 
-        response = supabase.table("telemetry_data").insert(payload).execute()
-        return jsonify({"message": "遙測資料接收成功"}), 201
+        # ==========================================
+        # 🌟 核心魔法：動態校正演算法 (Dynamic Calibration)
+        # ==========================================
+        if event == "pass" and direction_angle:
+            angle = float(direction_angle)
+            
+            # (A) 將 360 度轉換為精準的「單向」與「雙向」關鍵字
+            # 我們設定 +/- 45 度的容錯範圍
+            if 45 <= angle < 135:
+                # 朝東：代表西往東開
+                keywords = ["西往東", "東西"]
+            elif 135 <= angle < 225:
+                # 朝南：代表北往南開
+                keywords = ["北往南", "南北"]
+            elif 225 <= angle < 315:
+                # 朝西：代表東往西開
+                keywords = ["東往西", "東西"]
+            else:
+                # 朝北 (315~360 或 0~45)：代表南往北開
+                keywords = ["南往北", "南北"]
+
+            # (B) 從資料庫抓取該路口的設定
+            light_res = supabase.table("traffic_lights").select("*").eq("name", light_name).execute()
+            if light_res.data:
+                light = light_res.data[0]
+                phases = light.get("phases", [])
+                
+                # (C) 智慧比對：只要時相名稱包含我們推測的關鍵字，就判定命中！
+                target_idx = -1
+                for i, p in enumerate(phases):
+                    # any() 會檢查 keywords 裡的詞，有沒有出現在 p["direction"] 裡面
+                    if any(kw in p["direction"] for kw in keywords):
+                        target_idx = i
+                        break
+                
+                if target_idx != -1:
+                    # (D) 計算從週期開始，到這個「目標時相」亮綠燈，中間經過了幾秒？
+                    offset_seconds = 0
+                    for i in range(target_idx):
+                        offset_seconds += phases[i]["green_time"] + YELLOW_TIME
+                    
+                    # (E) 時空平移：我們假設「現在這一瞬間」剛好是該方向綠燈亮起的第 2 秒 (給一點緩衝)
+                    # 公式：新的週期起點 = 現在時間 - 目標時相前面的等待時間 - 2秒緩衝
+                    new_cycle_start = current_time - timedelta(seconds=(offset_seconds + 2))
+                    
+                    # (F) 更新資料庫！寫入新的時間基準點
+                    new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
+                    
+                    #print(f"✨ 觸發自動校正！路口: {light_name} | 強制切換為 {target_keyword} 綠燈")
+
+        return jsonify({"message": "遙測資料接收成功，並執行校正評估"}), 201
 
     except Exception as e:
-        print(f"遙測接收失敗: {e}")
+        print(f"遙測接收或校正失敗: {e}")
         return jsonify({"error": "伺服器錯誤", "details": str(e)}), 500
 
 if __name__ == "__main__":
