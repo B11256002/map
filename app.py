@@ -136,36 +136,32 @@ def upload_telemetry():
                     offset_to_green = 0
                     for i in range(target_idx):
                         offset_to_green += phases[i]["green_time"] + YELLOW_TIME
-
+                    
                     if event == "pass":
-                        # 【校正為綠燈】假設「現在」是該方向綠燈亮起的第 2 秒
-                        new_cycle_start = current_time - timedelta(seconds=(offset_to_green + 2))
+                        # 【校正為綠燈】狠狠推入綠燈區間 (假設已經綠燈 3 秒了)
+                        new_cycle_start = current_time - timedelta(seconds=(offset_to_green + 3))
                         action_msg = "🟢 綠燈"
 
                     elif event == "stop":
-                        # 【校正為紅燈】既然車子停了，代表該方向的綠燈「剛剛結束」，下一個方向的綠燈亮起了。
-                        # 所以我們要把時間軸，推移到該方向的「綠燈+黃燈」剛好跑完的那一秒。
+                        # 【校正為紅燈】計算該方向綠/黃燈總共佔用多少時間
                         target_phase_duration = phases[target_idx]["green_time"] + YELLOW_TIME
                         offset_to_red = offset_to_green + target_phase_duration
-
-                        # 假設紅燈剛亮起 1 秒
-                        new_cycle_start = current_time - timedelta(seconds=(offset_to_red + 1))
+                        
+                        # 狠狠推入紅燈區間 (假設紅燈已經亮起 5 秒了，消除伺服器與電腦的時間差)
+                        new_cycle_start = current_time - timedelta(seconds=(offset_to_red + 5))
                         action_msg = "🔴 紅燈"
-                    
+
                     # (E) 更新資料庫！寫入新的時間基準點
                     new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    res = supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
+                    supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
                     
-                    # 🌟 將校正結果整理好，準備傳給前端
+                    # 整理 debug 訊息
                     debug_info = {
                         "路口": light_name,
                         "判定方向": keywords[0],
-                        "執行動作": action_msg,
-                        "新基準時間": new_time_str,
-                        "資料庫是否成功修改": len(res.data) > 0
+                        "執行動作": action_msg
                     }
                     print(f"✨ 觸發自動校正: {debug_info}")
-
                     return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
                 
                 else:
