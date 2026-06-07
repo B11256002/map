@@ -423,29 +423,43 @@ function updateTrafficLightsUI() {
                 ? activeGreen - timeInActivePhase 
                 : (activeGreen + YELLOW_TIME) - timeInActivePhase;
 
-            // 修改後的程式碼：
-// 1. 最外層包一個 Wrapper，並放入精確定位的小圓點
-let html = `
-<div class="traffic-marker-wrapper">
-    <div class="intersection-dot"></div>
-    <div class="signboard-floating">
-        <div class="signboard-title">📍 ${light.name}</div>
-`;
+                        // ==========================================
+            // 產生 HTML UI (包含防遮擋的浮動面板設計)
+            // ==========================================
+            let html = `
+            <div class="traffic-marker-wrapper">
+                <div class="intersection-dot"></div>
+                <div class="signboard-floating">
+                    <div class="signboard-title">📍 ${light.name}</div>
+            `;
+            
+            phases.forEach((p, i) => {
+                let status, remain, colorClass, dot; // 👈 就是這行！剛剛不小心被刪掉了
+                
+                if (i === activeIdx) {
+                    status = activeStatus;
+                    remain = Math.ceil(activeRem);
+                } else {
+                    status = "red";
+                    let waitTime = (activeGreen + YELLOW_TIME) - timeInActivePhase;
+                    let currWalk = (activeIdx + 1) % phases.length;
+                    while (currWalk !== i) {
+                        waitTime += phases[currWalk].green_time + YELLOW_TIME;
+                        currWalk = (currWalk + 1) % phases.length;
+                    }
+                    remain = Math.ceil(waitTime);
+                }
 
-phases.forEach((p, i) => {
-    // ...(這裡面計算 status 和 remain 的邏輯完全不用動)...
-    if (i === activeIdx) { /* ... */ }
-    // ...
-
-    if (status === 'green') { colorClass = 'sign-green'; dot = '🟢'; } 
-    else if (status === 'yellow') { colorClass = 'sign-yellow'; dot = '🟡'; } 
-    else { colorClass = 'sign-red'; dot = '🔴'; }
-    
-    html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${remain}s</span></div>`;
-});
-
-// 2. 補上結尾的兩個 div 標籤
-html += `</div></div>`;
+                if (status === 'green') { colorClass = 'sign-green'; dot = '🟢'; } 
+                else if (status === 'yellow') { colorClass = 'sign-yellow'; dot = '🟡'; } 
+                else { colorClass = 'sign-red'; dot = '🔴'; }
+                
+                html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${remain}s</span></div>`;
+            });
+            
+            // 補上 Wrapper 結尾標籤
+            html += `</div></div>`;
+            // ==========================================
 
             // 更新地圖上的 Marker
             if (trafficLightMarkers[light.name]) {
