@@ -3,85 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧交通導航系統 (旗艦完全體)</title>
+    <title>智慧交通導航系統 (多時相旗艦版)</title>
     
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-    
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
 
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Noto Sans TC', sans-serif; overflow: hidden; }
         #map { width: 100%; height: 100vh; z-index: 1; }
 
-        .control-panel {
-            position: absolute; top: 20px; left: 20px; z-index: 1000;
-            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);
-            padding: 20px; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); width: 300px;
-            transition: transform 0.4s ease, opacity 0.4s ease;
-        }
+        /* UI 面板設定 */
+        .control-panel { position: absolute; top: 20px; left: 20px; z-index: 1000; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); padding: 20px; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.15); width: 300px; transition: transform 0.4s ease, opacity 0.4s ease; }
         h2 { margin-top: 0; font-size: 1.2rem; color: #333; }
         .instruction { font-size: 0.9rem; color: #666; margin-bottom: 15px; font-weight: bold; }
 
-        .btn {
-            width: 100%; padding: 10px; margin-top: 8px;
-            background: #2563eb; color: white; border: none;
-            border-radius: 8px; font-weight: bold; font-size: 0.95rem; cursor: pointer; transition: 0.3s;
-        }
+        .btn { width: 100%; padding: 10px; margin-top: 8px; background: #2563eb; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .btn:hover { background: #1d4ed8; }
         .btn-clear { background: #ef4444; }
         .btn-clear:hover { background: #b91c1c; }
         .btn-mode { background: #10b981; margin-bottom: 15px; }
         .btn-mode:hover { background: #059669; }
         .btn-locate { background: #f8fafc; color: #334155; border: 1px solid #cbd5e1; margin-bottom: 10px; }
-        .btn-locate:hover { background: #e2e8f0; }
         .btn-simulate { background: #8b5cf6; margin-top: 15px; display: none; }
-        .btn-simulate:hover { background: #7c3aed; }
 
-        .nav-dashboard {
-            position: absolute; z-index: 1001; left: 50%; transform: translateX(-50%);
-            width: 90%; max-width: 500px; text-align: center; color: white;
-            transition: opacity 0.4s ease, top 0.4s ease, bottom 0.4s ease;
-            opacity: 0; pointer-events: none;
-        }
+        /* 導航儀表板 */
+        .nav-dashboard { position: absolute; z-index: 1001; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; text-align: center; color: white; transition: opacity 0.4s ease, top 0.4s ease, bottom 0.4s ease; opacity: 0; pointer-events: none; }
         .nav-top { top: -100px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(10px); padding: 15px 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .nav-top h1 { margin: 0; font-size: 1.8rem; font-weight: bold; color: #4ade80; }
-        .nav-top p { margin: 5px 0 0 0; font-size: 1rem; color: #cbd5e1; }
-
-        .nav-bottom { bottom: -100px; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 20px; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.2); color: #333; display: flex; justify-content: space-between; align-items: center; }
-        .nav-bottom .stats { text-align: left; }
+        .nav-top h1 { margin: 0; font-size: 1.8rem; color: #4ade80; }
+        .nav-top p { margin: 5px 0 0 0; color: #cbd5e1; }
+        .nav-bottom { bottom: -100px; background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 20px; box-shadow: 0 -10px 30px rgba(0,0,0,0.2); color: #333; display: flex; justify-content: space-between; align-items: center; }
         .nav-bottom .stats h2 { margin: 0; font-size: 1.5rem; color: #2563eb; }
-        .nav-bottom .stats p { margin: 0; font-size: 0.9rem; color: #64748b; font-weight: bold; }
-        .nav-bottom-actions { display: flex; gap: 10px; }
-        .nav-bottom button { width: auto; margin: 0; padding: 10px 15px; }
-        
-        /* 偏離路線測試按鈕 */
-        .btn-deviate { background: #f59e0b; color: white; }
-        .btn-deviate:hover { background: #d97706; }
-
-        .btn-recenter { position: absolute; bottom: 120px; right: 20px; z-index: 1000; background: #2563eb; color: white; padding: 12px 20px; border-radius: 30px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(0,0,0,0.3); cursor: pointer; display: none; }
+        .btn-deviate { background: #f59e0b; color: white; padding: 10px 15px; border-radius:8px; border:none; cursor:pointer; font-weight:bold;}
+        .btn-recenter { position: absolute; bottom: 120px; right: 20px; z-index: 1000; background: #2563eb; color: white; padding: 12px 20px; border-radius: 30px; border: none; display: none; }
 
         body.is-navigating .control-panel { transform: translateX(-150%); opacity: 0; pointer-events: none; }
         body.is-navigating .nav-dashboard { opacity: 1; pointer-events: auto; }
         body.is-navigating .nav-top { top: 20px; }
         body.is-navigating .nav-bottom { bottom: 20px; }
 
+        /* --- 🌟 全新：多時相微型電子看板 UI --- */
+        .signboard {
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(5px);
+            border-radius: 8px; border: 1px solid #334155;
+            color: white; padding: 10px; font-size: 12px;
+            min-width: 140px; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .signboard-title { font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #fbbf24; border-bottom: 1px solid #475569; padding-bottom: 5px; }
+        .signboard-phase { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .sign-green { color: #4ade80; font-weight: bold; text-shadow: 0 0 5px #4ade80; }
+        .sign-red { color: #f87171; }
+
+        /* 動態新增表單 */
         .add-form input { width: 90%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
-        .add-form button { width: 100%; padding: 8px; margin-top: 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .light-marker { width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 14px; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5); text-shadow: 1px 1px 2px black; }
-        .light-red { background-color: #ef4444; box-shadow: 0 0 15px #ef4444; }
-        .light-green { background-color: #22c55e; box-shadow: 0 0 15px #22c55e; }
-        
+        .phase-input-group { display: flex; gap: 5px; margin-bottom: 5px; }
+        .phase-input-group input { margin: 0; width: 50%; }
+        .btn-add-phase { background: #64748b; margin-top: 5px; }
+        .btn-save { background: #10b981; }
+
         .nav-arrow-container { width: 40px; height: 40px; transition: transform 0.2s linear; }
-        .nav-arrow { width: 100%; height: 100%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg>'); background-size: contain; background-repeat: no-repeat; background-position: center; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); }
+        .nav-arrow { width: 100%; height: 100%; background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6" stroke="white" stroke-width="2"><path d="M12 2L22 20L12 17L2 20L12 2Z"/></svg>'); background-size: contain; background-position: center; filter: drop-shadow(0px 4px 6px rgba(0,0,0,0.5)); }
         .maplibregl-popup-content { padding: 15px; border-radius: 10px; }
     </style>
 </head>
 <body>
 
     <div class="control-panel" id="main-panel">
-        <h2>智慧交通系統 (完全體)</h2>
+        <h2>智慧交通系統 (多時相)</h2>
         <button class="btn btn-mode" id="mode-btn">切換至 🚦「新增號誌」模式</button>
         <button class="btn btn-locate" id="locate-btn">📍 定位我的位置</button>
         <p class="instruction" id="status-text">🚗 請點擊地圖設定「目的地」</p>
@@ -93,57 +82,34 @@
         <button class="btn btn-simulate" id="simulate-btn">🚗 模擬開車</button>
     </div>
 
-    <div class="nav-dashboard nav-top" id="nav-top">
-        <h1 id="nav-instruction">↑ 沿著藍色路線前進</h1>
-        <p id="nav-next-turn">系統運作中，請小心駕駛</p>
-    </div>
-
+    <!-- 導航介面 -->
+    <div class="nav-dashboard nav-top" id="nav-top"><h1 id="nav-instruction">↑ 沿著藍色路線前進</h1><p>請小心駕駛並觀察路口號誌</p></div>
     <div class="nav-dashboard nav-bottom" id="nav-bottom">
-        <div class="stats">
-            <h2 id="nav-eta">-- 分鐘</h2>
-            <p id="nav-distance">剩餘 -- 公里</p>
-        </div>
-        <div class="nav-bottom-actions">
-            <!-- 專為測試重算邏輯設計的惡搞按鈕 -->
-            <button class="btn btn-deviate" id="deviate-btn">🚨 轉錯彎測試</button>
-            <button class="btn btn-clear" id="exit-nav-btn">退出</button>
+        <div class="stats"><h2 id="nav-eta">-- 分鐘</h2><p id="nav-distance">剩餘 -- 公里</p></div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-deviate" id="deviate-btn">🚨 偏離測試</button>
+            <button class="btn btn-clear" id="exit-nav-btn" style="width:auto; margin:0;">退出</button>
         </div>
     </div>
-
     <button id="recenter-btn" class="btn-recenter">📍 回到導航視角</button>
 
     <div id="map"></div>
 
     <script>
         const map = new maplibregl.Map({
-            container: 'map',
-            style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
+            container: 'map', style: 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json',
             center: [121.5654, 25.0330], zoom: 14, pitch: 0, bearing: 0 
         });
-
         map.addControl(new maplibregl.NavigationControl());
 
-        // 狀態變數
         let isAddMode = false; let endPoint = null; let endMarker = null; let trafficLightMarkers = {}; 
         let userMarker = null; let userLngLat = null; let currentHeading = 0; 
+        let isNavigating = false; let isCameraLocked = true; let routeGeoJSON = null; let isRerouting = false;
+        let simulationInterval = null; let simState = { active: false, currentDistance: 0 };
 
-        // 導航核心狀態
-        let isNavigating = false; 
-        let isCameraLocked = true; 
-        let routeGeoJSON = null; 
-        let isRerouting = false; // 重算鎖定，避免狂發 API
-        
-        // 模擬器狀態
-        let simulationInterval = null; 
-        let simState = { active: false, currentDistance: 0 };
-
-        const modeBtn = document.getElementById('mode-btn');
-        const statusText = document.getElementById('status-text');
-        const planBtn = document.getElementById('plan-btn');
-        const clearBtn = document.getElementById('clear-btn');
-        const simulateBtn = document.getElementById('simulate-btn');
-        const recenterBtn = document.getElementById('recenter-btn');
-        const deviateBtn = document.getElementById('deviate-btn');
+        const modeBtn = document.getElementById('mode-btn'); const statusText = document.getElementById('status-text');
+        const planBtn = document.getElementById('plan-btn'); const clearBtn = document.getElementById('clear-btn');
+        const simulateBtn = document.getElementById('simulate-btn'); const recenterBtn = document.getElementById('recenter-btn');
 
         modeBtn.addEventListener('click', () => {
             isAddMode = !isAddMode;
@@ -160,7 +126,6 @@
             return ((Math.atan2(y, x) * toDeg) + 360) % 360;
         }
 
-        // --- 核心：更新車輛位置與 3D 鏡頭 ---
         function updateUserLocationUI(lng, lat, heading) {
             userLngLat = [lng, lat]; currentHeading = heading;
             if (!userMarker) {
@@ -174,106 +139,49 @@
                 if (arrowContainer) arrowContainer.style.transform = `rotate(${heading}deg)`;
             }
 
-            if (isNavigating && isCameraLocked) {
-                map.easeTo({ center: userLngLat, bearing: heading, pitch: 60, zoom: 18, duration: 1000, easing: t => t });
-            } else if (!isNavigating && isCameraLocked) {
-                map.easeTo({ center: userLngLat, duration: 1000 });
-            }
+            if (isNavigating && isCameraLocked) map.easeTo({ center: userLngLat, bearing: heading, pitch: 60, zoom: 18, duration: 1000, easing: t => t });
+            else if (!isNavigating && isCameraLocked) map.easeTo({ center: userLngLat, duration: 1000 });
 
-            // 每次移動後，檢查是否需要「吃掉路線」或「偏離重算」
-            if (isNavigating && routeGeoJSON && !isRerouting) {
-                checkRouteProgress();
-            }
+            if (isNavigating && routeGeoJSON && !isRerouting) checkRouteProgress();
         }
 
-        // --- 🚀 神級邏輯：吃掉路線與偏離偵測 ---
         function checkRouteProgress() {
             try {
-                const userPt = turf.point(userLngLat);
-                const routeLine = turf.lineString(routeGeoJSON.coordinates);
-                
-                // 1. 偵測是否偏離路線 (垂直距離 > 30 公尺)
+                const userPt = turf.point(userLngLat); const routeLine = turf.lineString(routeGeoJSON.coordinates);
                 const distanceToLine = turf.pointToLineDistance(userPt, routeLine, { units: 'meters' });
-                
-                if (distanceToLine > 30) {
-                    triggerReroute(); // 觸發重新規劃
-                    return;
-                }
+                if (distanceToLine > 30) { triggerReroute(); return; }
 
-                // 2. 吃掉路線 (Dynamic Truncation)
-                // 找出車子在藍線上的最近投影點
                 const snappedPt = turf.nearestPointOnLine(routeLine, userPt);
-                // 找出路線終點
                 const endPt = turf.point(routeGeoJSON.coordinates[routeGeoJSON.coordinates.length - 1]);
-                
-                // 從投影點「切片」到終點，前面的線段就丟棄了！
                 const slicedLine = turf.lineSlice(snappedPt, endPt, routeLine);
-                
-                // 更新地圖的路線資料
-                if (map.getSource('route')) {
-                    map.getSource('route').setData(slicedLine);
-                }
-            } catch (e) { console.error("處理動態路線錯誤:", e); }
+                if (map.getSource('route')) map.getSource('route').setData(slicedLine);
+            } catch (e) {}
         }
 
-        // --- 重新規劃路線 (Rerouting) ---
         async function triggerReroute() {
-            if (isRerouting) return;
-            isRerouting = true;
-            
-            // UI 提示
-            document.getElementById('nav-instruction').innerText = "⚠️ 偏離路線，重新規劃中...";
-            document.getElementById('nav-instruction').style.color = "#ef4444";
-
-            const startStr = `${userLngLat[0]},${userLngLat[1]}`;
-            const endStr = `${endPoint[0]},${endPoint[1]}`;
-
+            if (isRerouting) return; isRerouting = true;
+            document.getElementById('nav-instruction').innerText = "⚠️ 偏離路線，重算中..."; document.getElementById('nav-instruction').style.color = "#ef4444";
             try {
-                const response = await fetch(`/route?start=${startStr}&end=${endStr}`);
-                const data = await response.json();
-                
-                // 更新新的 GeoJSON
-                routeGeoJSON = data.routes[0].geometry;
-                map.getSource('route').setData(routeGeoJSON);
-                
-                // 更新剩餘時間與距離
-                const distanceKm = (data.routes[0].distance / 1000).toFixed(1);
-                const durationMin = Math.ceil(data.routes[0].duration / 60);
-                document.getElementById('nav-eta').innerText = `${durationMin} 分鐘`;
-                document.getElementById('nav-distance').innerText = `剩餘 ${distanceKm} 公里`;
-
-                // 恢復 UI
-                document.getElementById('nav-instruction').innerText = "↑ 沿著新路線前進";
-                document.getElementById('nav-instruction').style.color = "#4ade80";
-
-                // 如果正在模擬，也要重置模擬器的路徑
-                if (simState.active) {
-                    startSimulation(routeGeoJSON);
-                }
-            } catch (error) {
-                console.error("重新規劃失敗", error);
-                document.getElementById('nav-instruction').innerText = "❌ 網路錯誤，無法重算";
-            } finally {
-                setTimeout(() => { isRerouting = false; }, 2000); // 冷卻時間 2 秒
-            }
+                const res = await fetch(`/route?start=${userLngLat[0]},${userLngLat[1]}&end=${endPoint[0]},${endPoint[1]}`);
+                const data = await res.json();
+                routeGeoJSON = data.routes[0].geometry; map.getSource('route').setData(routeGeoJSON);
+                document.getElementById('nav-eta').innerText = `${Math.ceil(data.routes[0].duration / 60)} 分鐘`;
+                document.getElementById('nav-distance').innerText = `剩餘 ${(data.routes[0].distance / 1000).toFixed(1)} 公里`;
+                document.getElementById('nav-instruction').innerText = "↑ 沿著新路線前進"; document.getElementById('nav-instruction').style.color = "#4ade80";
+                if (simState.active) startSimulation(routeGeoJSON);
+            } catch (error) {} finally { setTimeout(() => { isRerouting = false; }, 2000); }
         }
 
-        // --- GPS 監聽 ---
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(
-                (position) => {
-                    if (simState.active) return; // 模擬中忽略真實 GPS
-                    const lng = position.coords.longitude; const lat = position.coords.latitude;
+                (pos) => {
+                    if (simState.active) return;
                     let heading = currentHeading;
-                    if (position.coords.heading !== null && !isNaN(position.coords.heading)) heading = position.coords.heading;
-                    else if (userLngLat) {
-                        const dist = turf.distance(turf.point(userLngLat), turf.point([lng, lat]), {units: 'meters'});
-                        if (dist > 2) heading = calculateBearing(userLngLat[0], userLngLat[1], lng, lat);
-                    }
-                    updateUserLocationUI(lng, lat, heading);
+                    if (pos.coords.heading !== null && !isNaN(pos.coords.heading)) heading = pos.coords.heading;
+                    else if (userLngLat && turf.distance(turf.point(userLngLat), turf.point([pos.coords.longitude, pos.coords.latitude]), {units: 'meters'}) > 2) heading = calculateBearing(userLngLat[0], userLngLat[1], pos.coords.longitude, pos.coords.latitude);
+                    updateUserLocationUI(pos.coords.longitude, pos.coords.latitude, heading);
                 },
-                (error) => { console.warn("GPS:", error.message); },
-                { enableHighAccuracy: true, maximumAge: 5000, timeout: 5000 }
+                (err) => {}, { enableHighAccuracy: true }
             );
         }
 
@@ -282,10 +190,30 @@
         document.getElementById('locate-btn').addEventListener('click', () => { isCameraLocked = true; if (userLngLat && !isNavigating) map.flyTo({ center: userLngLat, zoom: 16 }); });
 
         let popup = new maplibregl.Popup({ closeOnClick: false });
+        
+        // --- 🌟 全新：動態表單邏輯 ---
+        window.addPhaseInput = function() {
+            const container = document.getElementById('phases-container');
+            const div = document.createElement('div'); div.className = 'phase-input-group';
+            div.innerHTML = `<input type="text" class="p-dir" placeholder="方向 (例:左轉)"><input type="number" class="p-time" placeholder="綠燈秒數">`;
+            container.appendChild(div);
+        }
+
         map.on('click', function(e) {
             const lng = e.lngLat.lng; const lat = e.lngLat.lat;
             if (isAddMode) {
-                const formHtml = `<div class="add-form"><h4 style="margin-top:0; color:black;">新增紅綠燈</h4><input type="text" id="new-name" placeholder="路口名稱"><input type="number" id="new-red" placeholder="紅燈秒數 (預設 30)"><input type="number" id="new-green" placeholder="綠燈秒數 (預設 30)"><button onclick="submitLight(${lat}, ${lng})">儲存</button></div>`;
+                const formHtml = `
+                    <div class="add-form">
+                        <h4 style="margin-top:0; color:black;">🚦 新增多時相路口</h4>
+                        <input type="text" id="new-name" placeholder="路口名稱 (例:中正路口)">
+                        <div id="phases-container">
+                            <div class="phase-input-group"><input type="text" class="p-dir" value="南北向直行"><input type="number" class="p-time" placeholder="綠燈秒數"></div>
+                            <div class="phase-input-group"><input type="text" class="p-dir" value="東西向直行"><input type="number" class="p-time" placeholder="綠燈秒數"></div>
+                        </div>
+                        <button class="btn btn-add-phase" onclick="addPhaseInput()">➕ 新增一個方向</button>
+                        <button class="btn btn-save" onclick="submitLight(${lat}, ${lng})">儲存寫入資料庫</button>
+                    </div>
+                `;
                 popup.setLngLat([lng, lat]).setHTML(formHtml).addTo(map);
             } else {
                 if (isNavigating) return;
@@ -293,130 +221,102 @@
                 endPoint = [lng, lat];
                 if (!endMarker) endMarker = new maplibregl.Marker({ color: "#ef4444" }).setLngLat(endPoint).addTo(map);
                 else endMarker.setLngLat(endPoint);
-                statusText.innerText = "✅ 目的地已設定，可以規劃路線了！";
-                planBtn.disabled = false;
+                statusText.innerText = "✅ 目的地已設定，可以規劃路線了！"; planBtn.disabled = false;
             }
         });
 
         window.submitLight = async function(lat, lng) {
             const name = document.getElementById('new-name').value;
-            const red = document.getElementById('new-red').value || 30; const green = document.getElementById('new-green').value || 30;
             if (!name) return alert("請輸入路口名稱！");
+            
+            const phases = [];
+            const dirs = document.querySelectorAll('.p-dir');
+            const times = document.querySelectorAll('.p-time');
+            for(let i=0; i<dirs.length; i++) {
+                if(dirs[i].value && times[i].value) {
+                    phases.push({ direction: dirs[i].value, green_time: parseInt(times[i].value) });
+                }
+            }
+            if(phases.length < 2) return alert("一個路口至少需要填寫兩個方向的秒數！");
+
             try {
-                const res = await fetch('/add-light', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, lat, lng, red_time: red, green_time: green }) });
-                if (res.ok) { alert("✅ 成功！"); popup.remove(); fetchTrafficLights(); }
+                const res = await fetch('/add-light', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, lat, lng, phases }) });
+                if (res.ok) { alert("✅ 成功新增多時相路口！"); popup.remove(); fetchTrafficLights(); }
             } catch (error) { alert("發生錯誤！"); }
         }
 
+        // --- 路線規劃與導航控制保留原本完美邏輯 ---
         planBtn.addEventListener('click', async () => {
             if (!userLngLat || !endPoint) return;
-            if (planBtn.innerText === "開始導航") { startNavigationUI(); return; }
+            if (planBtn.innerText === "開始導航") {
+                isNavigating = true; isCameraLocked = true; document.body.classList.add('is-navigating');
+                document.getElementById('nav-instruction').innerText = "↑ 沿著藍色路線前進"; document.getElementById('nav-instruction').style.color = "#4ade80";
+                updateUserLocationUI(userLngLat[0], userLngLat[1], currentHeading); return;
+            }
             planBtn.innerText = "規劃中..."; planBtn.disabled = true;
-            const startStr = `${userLngLat[0]},${userLngLat[1]}`; const endStr = `${endPoint[0]},${endPoint[1]}`;
             try {
-                const response = await fetch(`/route?start=${startStr}&end=${endStr}`);
-                const data = await response.json();
+                const res = await fetch(`/route?start=${userLngLat[0]},${userLngLat[1]}&end=${endPoint[0]},${endPoint[1]}`); const data = await res.json();
                 routeGeoJSON = data.routes[0].geometry; 
-                
                 if (map.getSource('route')) map.getSource('route').setData(routeGeoJSON);
                 else {
                     map.addSource('route', { type: 'geojson', data: routeGeoJSON });
                     map.addLayer({ id: 'route-layer', type: 'line', source: 'route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#3b82f6', 'line-width': 8, 'line-opacity': 0.8 } });
                 }
-
-                const bounds = new maplibregl.LngLatBounds(userLngLat, userLngLat);
-                bounds.extend(endPoint); map.fitBounds(bounds, { padding: 50 });
-                
-                const distanceKm = (data.routes[0].distance / 1000).toFixed(1); const durationMin = Math.ceil(data.routes[0].duration / 60);
-                document.getElementById('nav-eta').innerText = `${durationMin} 分鐘`; document.getElementById('nav-distance').innerText = `剩餘 ${distanceKm} 公里`;
-                statusText.innerText = "🚗 路線已生成！請點擊開始導航";
-                planBtn.innerText = "開始導航"; planBtn.style.background = "#8b5cf6"; simulateBtn.style.display = "block";
-            } catch (error) { alert("路徑規劃失敗！"); planBtn.innerText = "規劃路線"; } finally { planBtn.disabled = false; }
+                const bounds = new maplibregl.LngLatBounds(userLngLat, userLngLat); bounds.extend(endPoint); map.fitBounds(bounds, { padding: 50 });
+                document.getElementById('nav-eta').innerText = `${Math.ceil(data.routes[0].duration / 60)} 分鐘`; document.getElementById('nav-distance').innerText = `剩餘 ${(data.routes[0].distance / 1000).toFixed(1)} 公里`;
+                statusText.innerText = "🚗 路線已生成！"; planBtn.innerText = "開始導航"; planBtn.style.background = "#8b5cf6"; simulateBtn.style.display = "block";
+            } catch (error) {} finally { planBtn.disabled = false; }
         });
 
-        function startNavigationUI() {
-            isNavigating = true; isCameraLocked = true;
-            document.body.classList.add('is-navigating');
-            document.getElementById('nav-instruction').innerText = "↑ 沿著藍色路線前進";
-            document.getElementById('nav-instruction').style.color = "#4ade80";
-            updateUserLocationUI(userLngLat[0], userLngLat[1], currentHeading); 
-        }
-
         document.getElementById('exit-nav-btn').addEventListener('click', () => {
-            isNavigating = false; isCameraLocked = true;
-            document.body.classList.remove('is-navigating');
+            isNavigating = false; isCameraLocked = true; document.body.classList.remove('is-navigating');
             map.flyTo({ center: userLngLat, pitch: 0, bearing: 0, zoom: 15, duration: 1500 });
-            if (simulationInterval) { clearInterval(simulationInterval); simState.active = false; }
-            clearRoute();
+            if (simulationInterval) { clearInterval(simulationInterval); simState.active = false; } clearRoute();
         });
 
         clearBtn.addEventListener('click', clearRoute);
         function clearRoute() {
             if (endMarker) endMarker.remove(); endMarker = null; endPoint = null; routeGeoJSON = null;
-            if (map.getLayer('route-layer')) map.removeLayer('route-layer');
-            if (map.getSource('route')) map.removeSource('route');
-            planBtn.disabled = true; planBtn.innerText = "規劃路線"; planBtn.style.background = "#2563eb";
-            simulateBtn.style.display = "none"; statusText.innerText = "🚗 請點擊地圖設定「目的地」";
+            if (map.getLayer('route-layer')) map.removeLayer('route-layer'); if (map.getSource('route')) map.removeSource('route');
+            planBtn.disabled = true; planBtn.innerText = "規劃路線"; planBtn.style.background = "#2563eb"; simulateBtn.style.display = "none"; statusText.innerText = "🚗 請點擊地圖設定「目的地」";
         }
 
-        // --- 🚗 模擬器功能增強 ---
-        simulateBtn.addEventListener('click', () => {
-            if (!routeGeoJSON) return;
-            startNavigationUI();
-            startSimulation(routeGeoJSON);
-        });
-
+        simulateBtn.addEventListener('click', () => { if (!routeGeoJSON) return; isNavigating = true; isCameraLocked = true; document.body.classList.add('is-navigating'); startSimulation(routeGeoJSON); });
         function startSimulation(geoJSON) {
-            simState.active = true;
-            simState.currentDistance = 0;
-            const line = turf.lineString(geoJSON.coordinates);
-            const totalDistance = turf.length(line, { units: 'meters' });
-            
+            simState.active = true; simState.currentDistance = 0;
+            const line = turf.lineString(geoJSON.coordinates); const totalDist = turf.length(line, { units: 'meters' });
             if (simulationInterval) clearInterval(simulationInterval);
-
             simulationInterval = setInterval(() => {
-                if (isRerouting) return; // 重算期間暫停移動
-                
-                simState.currentDistance += 15; // 每秒前進 15m
-                if (simState.currentDistance >= totalDistance) {
-                    clearInterval(simulationInterval);
-                    alert("🎉 已抵達目的地！");
-                    document.getElementById('exit-nav-btn').click();
-                    return;
-                }
-
-                const along = turf.along(line, simState.currentDistance, { units: 'meters' });
-                const nextLngLat = along.geometry.coordinates;
-                const heading = turf.bearing(turf.point(userLngLat), turf.point(nextLngLat));
-                
-                updateUserLocationUI(nextLngLat[0], nextLngLat[1], heading);
-                
-                const remainKm = ((totalDistance - simState.currentDistance) / 1000).toFixed(1);
-                document.getElementById('nav-distance').innerText = `剩餘 ${remainKm} 公里`;
+                if (isRerouting) return;
+                simState.currentDistance += 15;
+                if (simState.currentDistance >= totalDist) { clearInterval(simulationInterval); alert("🎉 已抵達目的地！"); document.getElementById('exit-nav-btn').click(); return; }
+                const along = turf.along(line, simState.currentDistance, { units: 'meters' }); const nextLngLat = along.geometry.coordinates;
+                updateUserLocationUI(nextLngLat[0], nextLngLat[1], turf.bearing(turf.point(userLngLat), turf.point(nextLngLat)));
+                document.getElementById('nav-distance').innerText = `剩餘 ${((totalDist - simState.currentDistance) / 1000).toFixed(1)} 公里`;
             }, 1000);
         }
+        document.getElementById('deviate-btn').addEventListener('click', () => { if (isNavigating) updateUserLocationUI(userLngLat[0] + 0.001, userLngLat[1], currentHeading); });
 
-        // 🚨 轉錯彎測試按鈕 (強制偏離路線)
-        deviateBtn.addEventListener('click', () => {
-            if (!isNavigating) return;
-            // 將車子強行向旁邊平移約 100 公尺 (經度 + 0.001)
-            const badLngLat = [userLngLat[0] + 0.001, userLngLat[1]];
-            updateUserLocationUI(badLngLat[0], badLngLat[1], currentHeading);
-            // checkRouteProgress 會馬上偵測到距離 > 30m，觸發 triggerReroute()
-        });
-
+        // --- 🌟 全新：渲染電子看板 ---
         async function fetchTrafficLights() {
             try {
                 const response = await fetch('/traffic-lights'); const lights = await response.json();
                 lights.forEach(light => {
-                    const id = light.name; const cssClass = light.status === 'red' ? 'light-red' : 'light-green';
-                    if (trafficLightMarkers[id]) {
-                        trafficLightMarkers[id].getElement().className = `light-marker ${cssClass}`;
-                        trafficLightMarkers[id].getElement().innerText = light.remain;
+                    // 組裝電子看板 HTML
+                    let html = `<div class="signboard"><div class="signboard-title">📍 ${light.name}</div>`;
+                    light.phases.forEach(p => {
+                        let colorClass = p.status === 'green' ? 'sign-green' : 'sign-red';
+                        let dot = p.status === 'green' ? '🟢' : '🔴';
+                        html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${p.remain}s</span></div>`;
+                    });
+                    html += `</div>`;
+
+                    if (trafficLightMarkers[light.name]) {
+                        trafficLightMarkers[light.name].getElement().innerHTML = html;
                     } else {
-                        const el = document.createElement('div'); el.className = `light-marker ${cssClass}`; el.innerText = light.remain;
-                        const markerPopup = new maplibregl.Popup({ offset: 25 }).setHTML(`<b>${light.name}</b><br>紅燈:${light.red_time}s / 綠燈:${light.green_time}s`);
-                        trafficLightMarkers[id] = new maplibregl.Marker({ element: el }).setLngLat([light.lng, light.lat]).setPopup(markerPopup).addTo(map);
+                        const el = document.createElement('div'); el.innerHTML = html;
+                        // 注意這裡移除了 setPopup()，因為看板本身資訊就夠齊全了
+                        trafficLightMarkers[light.name] = new maplibregl.Marker({ element: el }).setLngLat([light.lng, light.lat]).addTo(map);
                     }
                 });
             } catch (error) { console.error("號誌:", error); }
