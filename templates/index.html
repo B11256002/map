@@ -54,6 +54,7 @@
         .signboard-phase { display: flex; justify-content: space-between; margin-bottom: 4px; }
         .sign-green { color: #4ade80; font-weight: bold; text-shadow: 0 0 5px #4ade80; }
         .sign-red { color: #f87171; }
+        .sign-yellow { color: #facc15; font-weight: bold; text-shadow: 0 0 8px #facc15; }
 
         /* 動態新增表單 */
         .add-form input { width: 90%; padding: 8px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
@@ -297,16 +298,28 @@
         }
         document.getElementById('deviate-btn').addEventListener('click', () => { if (isNavigating) updateUserLocationUI(userLngLat[0] + 0.001, userLngLat[1], currentHeading); });
 
-        // --- 🌟 全新：渲染電子看板 ---
+                // --- 🌟 支援黃燈：渲染電子看板 ---
         async function fetchTrafficLights() {
             try {
-                const response = await fetch('/traffic-lights'); const lights = await response.json();
+                const response = await fetch('/traffic-lights'); 
+                const lights = await response.json();
+                
                 lights.forEach(light => {
-                    // 組裝電子看板 HTML
                     let html = `<div class="signboard"><div class="signboard-title">📍 ${light.name}</div>`;
+                    
                     light.phases.forEach(p => {
-                        let colorClass = p.status === 'green' ? 'sign-green' : 'sign-red';
-                        let dot = p.status === 'green' ? '🟢' : '🔴';
+                        // 根據狀態給予顏色和圖示
+                        let colorClass = 'sign-red';
+                        let dot = '🔴';
+                        
+                        if (p.status === 'green') {
+                            colorClass = 'sign-green';
+                            dot = '🟢';
+                        } else if (p.status === 'yellow') {
+                            colorClass = 'sign-yellow';
+                            dot = '🟡';
+                        }
+                        
                         html += `<div class="signboard-phase"><span>${p.direction}</span><span class="${colorClass}">${dot} ${p.remain}s</span></div>`;
                     });
                     html += `</div>`;
@@ -315,7 +328,6 @@
                         trafficLightMarkers[light.name].getElement().innerHTML = html;
                     } else {
                         const el = document.createElement('div'); el.innerHTML = html;
-                        // 注意這裡移除了 setPopup()，因為看板本身資訊就夠齊全了
                         trafficLightMarkers[light.name] = new maplibregl.Marker({ element: el }).setLngLat([light.lng, light.lat]).addTo(map);
                     }
                 });
