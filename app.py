@@ -134,41 +134,38 @@ def upload_telemetry():
                 if target_idx != -1:
                     
                     if event == "pass":
-                        # 【校正為綠燈】我們希望現在亮綠燈的是「目標方向」
-                        forced_active_idx = target_idx
-                        action_msg = f"🟢 綠燈 (鎖定該方向)"
-                    
+                        # 【校正為綠燈】設定為「目標時相」剛亮起 3 秒
+                        target_elapsed = 0
+                        for i in range(target_idx):
+                            target_elapsed += phases[i]["green_time"] + YELLOW_TIME
+                        target_elapsed += 3
+                        action_msg = f"🟢 綠燈 (剛亮起 3 秒)"
+                        
                     elif event == "stop":
-                        # 【校正為紅燈】既然該方向停下，代表它結束了。
-                        # 我們強制讓「下一個順位」的方向亮起綠燈！(確保順序絕對正確)
-                        forced_active_idx = (target_idx + 1) % len(phases)
-                        action_msg = f"🔴 紅燈 (強制讓下一順位亮綠燈)"
-
-                    # (D) 計算從週期開始，到這個「被強制啟動的時相」經過了多久
-                    offset_to_forced_phase = 0
-                    for i in range(forced_active_idx):
-                        offset_to_forced_phase += phases[i]["green_time"] + YELLOW_TIME
-                    
-                    # 狠狠推入這個被啟動時相的「綠燈正中間」(絕對避開黃燈交界處)
-                    safe_buffer = phases[forced_active_idx]["green_time"] / 2
-                    target_elapsed = offset_to_forced_phase + safe_buffer
+                        # 【校正為紅燈】設定為「下一個時相」剛亮起 3 秒
+                        next_idx = (target_idx + 1) % len(phases)
+                        target_elapsed = 0
+                        # 迴圈會自動加總直到 next_idx
+                        for i in range(next_idx):
+                            target_elapsed += phases[i]["green_time"] + YELLOW_TIME
+                        target_elapsed += 3
+                        action_msg = f"🔴 紅燈 (強制下一順位剛亮綠燈)"
 
                     # (E) 更新資料庫！寫入新的時間基準點
+                    # 公式：新的起點 = 現在時間 - 已經經過的時間
                     new_cycle_start = current_time - timedelta(seconds=target_elapsed)
                     new_time_str = new_cycle_start.strftime("%Y-%m-%dT%H:%M:%SZ")
                     supabase.table("traffic_lights").update({"cycle_start": new_time_str}).eq("name", light_name).execute()
                     
-                    # 整理 debug 訊息
+                    # 🌟 整理 debug 訊息 (加入命中時相，抓出第 2 個路口不變的兇手！)
                     debug_info = {
                         "路口": light_name,
                         "判定方向": keywords[0],
+                        "命中時相": phases[target_idx]["direction"], # 👈 新增這行，讓後端說出它認到誰
                         "執行動作": action_msg
                     }
                     print(f"✨ 觸發自動校正: {debug_info}")
                     return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
-
-
-        return jsonify({"message": "遙測資料接收成功，無須校正"}), 201
 
     except Exception as e:
         print(f"遙測接收或校正失敗: {e}")
