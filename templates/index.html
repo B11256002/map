@@ -414,7 +414,7 @@ function updateTrafficLightsUI() {
             const cycleStartStr = light.cycle_start.endsWith('Z')
                 ? light.cycle_start 
                 : light.cycle_start + 'Z';
-            const startTime = new Date(cycle_start);
+            const startTime = new Date(cycleStartStr);
 
             const elapsedSec = (now.getTime() - startTime.getTime()) / 1000;
 
