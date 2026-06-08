@@ -409,9 +409,18 @@ function updateTrafficLightsUI() {
     rawLightsData.forEach(light => {
         try {
             // 解析資料庫的開始時間 (UTC)
-            const startTime = new Date(light.cycle_start);
-            const elapsedSec = (now.getTime() - startTime.getTime()) / 1000;
+            
+            
+            
             const phases = light.phases;
+            // ✅ 修正：強制補上 Z，確保一定被當成 UTC 解析
+            const cycleStartStr = light.cycle_start.endsWith('Z')
+                ? light.cycle_start 
+                : light.cycle_start + 'Z';
+            const startTime = new Date(light.cycle_start);
+
+            const elapsedSec = (now.getTime() - startTime.getTime()) / 1000;
+
             if (!phases || phases.length === 0) return;
 
             // 計算總週期
