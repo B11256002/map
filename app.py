@@ -168,6 +168,8 @@ def upload_telemetry():
                     }
                     print(f"✨ 觸發自動校正: {debug_info}")
                     return jsonify({"message": "遙測資料接收成功，已執行校正", "debug": debug_info}), 201
+                
+            return jsonify({"message": "遙測資料接收成功，無需校正"}), 201       
 
     except Exception as e:
         print(f"遙測接收或校正失敗: {e}")

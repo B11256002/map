@@ -522,13 +522,12 @@ map.on('contextmenu', (e) => {
 let currentApproachingLight = null; // 記錄目前靠近哪個紅綠燈
 let lastEventSent = null; // 防止重複瘋狂發送同一個狀態
 
-// 1. 建立打 API 的函式
+
 // 1. 建立打 API 的函式
 async function sendTelemetry(lightName, event) {
     if (lastEventSent === event && currentApproachingLight === lightName) return; 
     
     try {
-        // 🌟 獲取下拉選單的值
         const forceHeadingValue = document.getElementById('force-heading').value;
         let finalHeading = (forceHeadingValue !== "auto") ? forceHeadingValue : Math.round(currentHeading).toString();
 
@@ -543,14 +542,16 @@ async function sendTelemetry(lightName, event) {
             })
         });
         
-        // 🌟🌟🌟 把伺服器的回報印出來抓兇手！
         const resData = await response.json();
         console.log(`📤 上報狀態 [${finalHeading}° - ${event}]:`, resData);
         
         lastEventSent = event;
         currentApproachingLight = lightName;
 
-        fetchTrafficLights();
+        // ✅ 修正：等後端寫完資料庫再抓，給 500ms 緩衝
+        setTimeout(() => {
+            fetchTrafficLights();
+        }, 500);
         
     } catch (e) {
         console.error("上報失敗", e);
