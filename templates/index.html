@@ -444,6 +444,20 @@ function updateTrafficLightsUI() {
                 ? activeGreen - timeInActivePhase 
                 : (activeGreen + YELLOW_TIME) - timeInActivePhase;
 
+            // ✅ 加入這段 debug log
+            if (light.name === "壽比小七" || light.name === "學府四維") {
+                console.log(`📊 [${light.name}]`, {
+                    cycle_start: light.cycle_start,
+                    elapsedSec: elapsedSec.toFixed(1),
+                    totalTime,
+                    currentInCycle: currentInCycle.toFixed(1),
+                    activeIdx,
+                    activePhase: phases[activeIdx].direction,
+                    activeStatus,
+                    activeRem: activeRem.toFixed(1)
+                });
+            }
+
                         // ==========================================
             // 產生 HTML UI (包含防遮擋的浮動面板設計)
             // ==========================================
