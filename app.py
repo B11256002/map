@@ -138,18 +138,20 @@ def upload_telemetry():
                         target_elapsed = 0
                         for i in range(target_idx):
                             target_elapsed += phases[i]["green_time"] + YELLOW_TIME
-                        target_elapsed += 0
+                        target_elapsed += 3
                         action_msg = f"🟢 綠燈 (剛亮起 3 秒)"
                         
                     elif event == "stop":
-                        # 【校正為紅燈】設定為「下一個時相」剛亮起 3 秒
+                        # ✅ 正確做法：加總從頭到 target_idx（含）的所有時間
+                        # 這樣 new_cycle_start 就會讓現在剛好是「下一個時相的第3秒」
                         next_idx = (target_idx + 1) % len(phases)
                         target_elapsed = 0
                         # 迴圈會自動加總直到 next_idx
-                        for i in range(next_idx):
+                        for i in range(target_idx + 1):  # ✅ 改成 target_idx + 1
                             target_elapsed += phases[i]["green_time"] + YELLOW_TIME
-                        target_elapsed += 3
-                        action_msg = f"🔴 紅燈 (強制下一順位剛亮綠燈)"
+
+                        target_elapsed += 3  # 進入下一時相後已過3秒
+                        action_msg = f"🔴 紅燈 (強制 {phases[next_idx]['direction']} 剛亮綠燈)"
 
                     # (E) 更新資料庫！寫入新的時間基準點
                     # 公式：新的起點 = 現在時間 - 已經經過的時間
