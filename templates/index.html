@@ -529,7 +529,9 @@ async function sendTelemetry(lightName, event) {
     
     try {
         const forceHeadingValue = document.getElementById('force-heading').value;
-        let finalHeading = (forceHeadingValue !== "auto") ? forceHeadingValue : Math.round(currentHeading).toString();
+        let finalHeading = (forceHeadingValue !== "auto") 
+            ? forceHeadingValue 
+            : Math.round(currentHeading).toString();
 
         const response = await fetch('/upload-telemetry', {
             method: 'POST',
@@ -548,10 +550,8 @@ async function sendTelemetry(lightName, event) {
         lastEventSent = event;
         currentApproachingLight = lightName;
 
-        // ✅ 修正：等後端寫完資料庫再抓，給 500ms 緩衝
-        setTimeout(() => {
-            fetchTrafficLights();
-        }, 500);
+        // ✅ 關鍵修正：等 800ms 再抓，確保資料庫已寫完
+        setTimeout(fetchTrafficLights, 800);
         
     } catch (e) {
         console.error("上報失敗", e);
